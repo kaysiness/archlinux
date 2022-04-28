@@ -1,9 +1,3 @@
-# 前言
-記錄下我在使用Archlinux時的各種折騰，已方便日後繼續折騰🙃
-
----
-
-- [前言](#前言)
 - [安裝基本系統](#安裝基本系統)
   - [硬盤分區](#硬盤分區)
   - [安裝系統](#安裝系統)
@@ -30,6 +24,7 @@
 - [Docker](#docker)
 - [Flatpak](#flatpak)
 
+---
 
 # 安裝基本系統
 參照官方[Wiki](https://wiki.archlinux.org/title/Installation_guide)。
@@ -211,7 +206,6 @@ systemctl edit --user --force --full firefox@.service
 ```systemd
 [Unit]
 Description=Start firefox with the specified profile
-After=sddm.service
 PartOf=graphics.target
 
 [Service]
