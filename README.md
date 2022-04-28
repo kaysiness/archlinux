@@ -1,11 +1,41 @@
 # 前言
 記錄下我在使用Archlinux時的各種折騰，已方便日後繼續折騰🙃
 
+---
+
+- [前言](#前言)
+- [安裝基本系統](#安裝基本系統)
+  - [硬盤分區](#硬盤分區)
+  - [安裝系統](#安裝系統)
+  - [安裝GRUB](#安裝grub)
+  - [重啓前的準備](#重啓前的準備)
+    - [新建普通用戶](#新建普通用戶)
+    - [讓普通用戶使用sudo](#讓普通用戶使用sudo)
+    - [啓用NTP矯時](#啓用ntp矯時)
+    - [更換源](#更換源)
+- [安裝桌面環境](#安裝桌面環境)
+  - [安裝Xorg和顯卡驅動](#安裝xorg和顯卡驅動)
+  - [PulseAudio](#pulseaudio)
+  - [NetworkManager](#networkmanager)
+  - [字體](#字體)
+  - [安裝KDE](#安裝kde)
+  - [輸入法Fcitx](#輸入法fcitx)
+- [配置KDE](#配置kde)
+  - [創建家目錄下的默認目錄](#創建家目錄下的默認目錄)
+  - [環境變量](#環境變量)
+  - [HiDPI](#hidpi)
+  - [Firefox相關](#firefox相關)
+    - [使用systemd啓動Firefox](#使用systemd啓動firefox)
+- [Zsh](#zsh)
+- [Docker](#docker)
+- [Flatpak](#flatpak)
+
+
 # 安裝基本系統
 參照官方[Wiki](https://wiki.archlinux.org/title/Installation_guide)。
 
 ## 硬盤分區
-因爲使用的是EUFI+GPT分區，在使用`fdisk`分區時需要將一個至少500MB大小的分區設成`EFI System`類型。
+因爲使用的是EUFI+GPT分區，在使用`fdisk`分區時需要將一個至少500MB大小的分區設成`EFI System`類型。以下稱爲esp分區。
 ```sh
 # 格式化esp分區
 mkfs.fat -F 32 -n BOOT /dev/nvme0n1p1
@@ -46,12 +76,13 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 ## 重啓前的準備
 
-新建普通用戶
+### 新建普通用戶
 ```sh
 useradd -m -G wheel -s /bin/bash kaysiness
 passwd kaysiness
 ```
-讓普通用戶使用sudo
+
+### 讓普通用戶使用sudo
 ```sh
 env EDITOR=/usr/bin/vim visudo
 ```
@@ -64,7 +95,27 @@ Defaults      editor=/usr/bin/vim, !env_editor
 kaysiness     ALL=(ALL:ALL) ALL
 kaysiness     ALL=NOPASSWD: /usr/bin/pacman,/usr/bin/yay
 ```
+
+### 啓用NTP矯時
+```sh
+timedatactl set-ntp true
+```
+
+### 更換源
+```sh
+vim /etc/pacman.d/mirrorlist
+Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
+
+vim /etc/pacman.conf
+# 把Color前的註釋去掉，讓Pacman可以彩色輸出
+[archlinuxcn]
+Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch
+
+pacman -Syy archlinuxcn-keyring
+```
+
 然後就能重啓進入Archlinux了。
+
 
 # 安裝桌面環境
 
@@ -89,6 +140,9 @@ sudo pacman -S pulseaudio pulseaudio-alsa
 ```sh
 sudo pacman -S networkmanager
 sudo systemctl enable NetworkManager.service
+
+# 如果有用其他網絡管理，需要禁用掉
+sudo systemctl disable systemd-networkd.service systemd-resolved.service
 ```
 
 ## 字體
@@ -105,7 +159,7 @@ sudo pacman -S ttf-dejavu \
 注意事項
 * `phonon`後端使用`GStreamer`
 * `plasma-pa`和`plasma-nm`用於PulseAudio和NetworkManager的組件
-* `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的`powerdevil-light`
+* `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
 ```sh
 sudo pacman -S plasma-desktop kde-applications-meta \
                plasma-pa plasma-nm \
@@ -121,6 +175,7 @@ sudo systemctl enable sddm.service
 ```sh
 sudo pacman -S fcitx5-im fcitx5-rime fcitx5-mozc
 ```
+
 
 # 配置KDE
 
@@ -148,6 +203,30 @@ firefox -P
 讓Firefox和KDE集成
 * https://wiki.archlinux.org/title/Firefox#KDE_integration
 
+### 使用systemd啓動Firefox
+因爲有在同時使用多個profile，使用systemd可以方便的啓動不同profile。
+```sh
+systemctl edit --user --force --full firefox@.service
+```
+```systemd
+[Unit]
+Description=Start firefox with the specified profile
+After=sddm.service
+PartOf=graphics.target
+
+[Service]
+Environment=GTK_USE_PORTAL=1
+Type=simple
+ExecStart=/usr/bin/firefox -P "%i"
+
+[Install]
+WantedBy=multi-user.target
+```
+啓動指定的profile
+```
+systemctl start --user firefox@kaysiness.main
+```
+
 
 # Zsh
 * https://wiki.archlinux.org/title/Zsh
@@ -155,3 +234,17 @@ firefox -P
 sudo pacman -S zsh zsh-completions grml-zsh-config
 ```
 TODO
+
+
+# Docker
+```sh
+sudo pacman -S docker
+sudo systemctl enable docker.service
+```
+
+
+# Flatpak
+* https://wiki.archlinux.org/title/Flatpak
+```sh
+sudo pacman -S flatpak
+```
