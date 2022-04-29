@@ -14,7 +14,7 @@
   - [字體](#字體)
   - [安裝KDE](#安裝kde)
   - [輸入法Fcitx](#輸入法fcitx)
-- [配置KDE](#配置kde)
+- [配置桌面環境](#配置桌面環境)
   - [創建家目錄下的默認目錄](#創建家目錄下的默認目錄)
   - [環境變量](#環境變量)
   - [HiDPI](#hidpi)
@@ -53,6 +53,7 @@ pacstrap /mnt base linux-lts linux-firmware btrfs-progs grub efibootmgr sudo vim
 
 ## 安裝GRUB
 ```sh
+# os-prober 用於發現其他分區/硬盤上的系統，不需要的可以不裝
 pacman -Sy os-prober
 vim /etc/default/grub
 ```
@@ -78,6 +79,7 @@ passwd kaysiness
 ```
 
 ### 讓普通用戶使用sudo
+* https://wiki.archlinux.org/title/Sudo
 ```sh
 env EDITOR=/usr/bin/vim visudo
 ```
@@ -106,8 +108,10 @@ vim /etc/pacman.conf
 [archlinuxcn]
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch
 
-pacman -Syy archlinuxcn-keyring
+pacman -Syy archlinuxcn-keyring yay
 ```
+
+※ `yay`位於`archlinuxcn`源裏，不启用的話就只能通過[AUR](https://aur.archlinux.org/packages/yay)安裝了。
 
 然後就能重啓進入Archlinux了。
 
@@ -121,19 +125,19 @@ pacman -Syy archlinuxcn-keyring
 * https://wiki.archlinux.org/title/Xorg
 * https://wiki.archlinux.org/title/AMDGPU
 ```sh
-sudo pacman -S xorg-server xf86-video-amdgpu \
+yay -S xorg-server xf86-video-amdgpu \
                mesa-vdpau \
                vulkan-radeon
 ```
 
 ## PulseAudio
 ```sh
-sudo pacman -S pulseaudio pulseaudio-alsa
+yay -S pulseaudio pulseaudio-alsa
 ```
 
 ## NetworkManager
 ```sh
-sudo pacman -S networkmanager
+yay -S networkmanager
 sudo systemctl enable NetworkManager.service
 
 # 如果有用其他網絡管理，需要禁用掉
@@ -142,7 +146,7 @@ sudo systemctl disable systemd-networkd.service systemd-resolved.service
 
 ## 字體
 ```sh
-sudo pacman -S ttf-dejavu \
+yay -S ttf-dejavu \
                noto-fonts-cjk noto-fonts-emoji noto-fonts \
                wqy-microhei
 ```
@@ -156,10 +160,11 @@ sudo pacman -S ttf-dejavu \
 * `plasma-pa`和`plasma-nm`用於PulseAudio和NetworkManager的組件
 * `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
 ```sh
-sudo pacman -S plasma-desktop kde-applications-meta \
+yay -S plasma-desktop kde-applications-meta \
                plasma-pa plasma-nm \
                sddm sddm-kcm \
-               kde-gtk-config breeze-gtk
+               kde-gtk-config breeze-gtk \
+               powerdevil
                
 sudo systemctl enable sddm.service
 ```
@@ -168,15 +173,15 @@ sudo systemctl enable sddm.service
 * https://wiki.archlinux.org/title/Fcitx5_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)
 * [Rime設定](https://github.com/wongdean/rime-settings)
 ```sh
-sudo pacman -S fcitx5-im fcitx5-rime fcitx5-mozc
+yay -S fcitx5-im fcitx5-rime fcitx5-mozc
 ```
 
 
-# 配置KDE
+# 配置桌面環境
 
 ## 創建家目錄下的默認目錄
 ```sh
-sudo pacman -S xdg-user-dirs
+yay -S xdg-user-dirs
 LC_ALL=C xdg-user-dirs-update --force   # 使用英文名字創建
 ```
 
@@ -192,7 +197,7 @@ TODO
 
 ## Firefox相關
 ```sh
-sudo pacman -S firefox firefox-i18n-zh-tw
+yay -S firefox firefox-i18n-zh-tw
 firefox -P
 ```
 讓Firefox和KDE集成
@@ -225,14 +230,14 @@ systemctl start --user firefox@kaysiness.main
 # Zsh
 * https://wiki.archlinux.org/title/Zsh
 ```sh
-sudo pacman -S zsh zsh-completions grml-zsh-config
+yay -S zsh zsh-completions grml-zsh-config
 ```
 TODO
 
 
 # Docker
 ```sh
-sudo pacman -S docker
+yay -S docker
 sudo systemctl enable docker.service
 ```
 
@@ -240,5 +245,5 @@ sudo systemctl enable docker.service
 # Flatpak
 * https://wiki.archlinux.org/title/Flatpak
 ```sh
-sudo pacman -S flatpak
+yay -S flatpak
 ```
