@@ -22,7 +22,9 @@
     - [使用systemd啓動Firefox](#使用systemd啓動firefox)
 - [Zsh](#zsh)
 - [Docker](#docker)
+  - [OneDrive](#onedrive)
 - [Flatpak](#flatpak)
+- [常用軟件](#常用軟件)
 
 ---
 
@@ -53,17 +55,12 @@ pacstrap /mnt base linux-lts linux-firmware btrfs-progs grub efibootmgr sudo vim
 
 ## 安裝GRUB
 ```sh
-# os-prober 用於發現其他分區/硬盤上的系統，不需要的可以不裝
-pacman -Sy os-prober
 vim /etc/default/grub
-```
-```apache
-# 允許GRUB發現其他分區上的系統
-GRUB_DISABLE_OS_PROBER=true
-
 # 等待時間
 GRUB_TIMEOUT=0
 ```
+※ 如需要發現其他硬盤上的Windows系統，可以參考這篇[Wiki](https://wiki.archlinux.org/title/GRUB#Windows_installed_in_UEFI/GPT_mode)。直接把生成的內容寫入`/etc/grub.d/40_custom`末尾。
+
 
 ```sh
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
@@ -126,8 +123,8 @@ pacman -Syy archlinuxcn-keyring yay
 * https://wiki.archlinux.org/title/AMDGPU
 ```sh
 yay -S xorg-server xf86-video-amdgpu \
-               mesa-vdpau \
-               vulkan-radeon
+       mesa-vdpau \
+       vulkan-radeon
 ```
 
 ## PulseAudio
@@ -147,8 +144,8 @@ sudo systemctl disable systemd-networkd.service systemd-resolved.service
 ## 字體
 ```sh
 yay -S ttf-dejavu \
-               noto-fonts-cjk noto-fonts-emoji noto-fonts \
-               wqy-microhei
+       noto-fonts-cjk noto-fonts-emoji noto-fonts \
+       wqy-microhei
 ```
 
 ## 安裝KDE
@@ -161,10 +158,10 @@ yay -S ttf-dejavu \
 * `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
 ```sh
 yay -S plasma-desktop kde-applications-meta \
-               plasma-pa plasma-nm \
-               sddm sddm-kcm \
-               kde-gtk-config breeze-gtk \
-               powerdevil
+       plasma-pa plasma-nm \
+       sddm sddm-kcm \
+       kde-gtk-config breeze-gtk \
+       powerdevil
                
 sudo systemctl enable sddm.service
 ```
@@ -211,7 +208,7 @@ systemctl edit --user --force --full firefox@.service
 ```systemd
 [Unit]
 Description=Start firefox with the specified profile
-PartOf=graphics.target
+PartOf=graphical.target
 
 [Service]
 Environment=GTK_USE_PORTAL=1
@@ -241,9 +238,36 @@ yay -S docker
 sudo systemctl enable docker.service
 ```
 
+## OneDrive
+* https://github.com/abraunegg/onedrive/blob/master/docs/Docker.md
+```sh
+mkdir ~/OneDrive
+mkdir ~/.config/onedrive
+
+vim ~/.config/onedrive/config
+# 添加排除同步的目錄和文件
+skip_dir = "dir1|dir2|dir3"
+skip_dir = "root/path/to/dir1|root/path/to/dir2"
+skip_dir = "Data/Backup"
+skip_file = "Data/file.txt"
+```
+```sh
+docker run -it --name onedrive \
+    -v "~/.config/onedrive:/onedrive/conf" \
+    -v "~/OneDrive:/onedrive/data" \
+    -e "ONEDRIVE_UID=1000" \
+    -e "ONEDRIVE_GID=1000" \
+    -e "ONEDRIVE_RESYNC=1" \
+    driveone/onedrive:latest
+```
+
 
 # Flatpak
 * https://wiki.archlinux.org/title/Flatpak
 ```sh
 yay -S flatpak
 ```
+
+# 常用軟件
+* Visual Studio Code：`yay -S vscodium libdbusmenu-glib`
+* XnView MP：`yay -S xnviewmp-system-libs`
