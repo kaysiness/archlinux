@@ -23,6 +23,7 @@
 - [Zsh](#zsh)
 - [Docker](#docker)
   - [OneDrive](#onedrive)
+  - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
 - [常用軟件](#常用軟件)
 
@@ -234,8 +235,12 @@ TODO
 
 # Docker
 ```sh
-yay -S docker
+yay -S docker docker-compose
 sudo systemctl enable docker.service
+```
+※ 我個人比較喜歡把Docker的各種容器配置文件放在`/docker`下。
+```sh
+sudo mkdir /docker
 ```
 
 ## OneDrive
@@ -251,16 +256,49 @@ skip_dir = "root/path/to/dir1|root/path/to/dir2"
 skip_dir = "Data/Backup"
 skip_file = "Data/file.txt"
 ```
+※ 第一次運行需要輸入API Token
 ```sh
 docker run -it --name onedrive \
-    -v "~/.config/onedrive:/onedrive/conf" \
-    -v "~/OneDrive:/onedrive/data" \
-    -e "ONEDRIVE_UID=1000" \
-    -e "ONEDRIVE_GID=1000" \
-    -e "ONEDRIVE_RESYNC=1" \
+    -v ~/.config/onedrive:/onedrive/conf \
+    -v ~/OneDrive:/onedrive/data \
+    -e ONEDRIVE_UID=1000 \
+    -e ONEDRIVE_GID=1000 \
+    -e ONEDRIVE_RESYNC=1 \
+    --restart unless-stopped
     driveone/onedrive:latest
 ```
 
+
+## Jellyfin
+* https://jellyfin.org/docs/general/administration/installing.html#docker
+```sh
+sudo mkdir -p /docker/jellyfin/{config,cache}
+sudo chown kaysiness:kaysiness -R /docker/jellyfin
+```
+新建`docker-compose.yml`文件
+```yml
+version: "3.5"
+services:
+  jellyfin:
+    # 目前的穩定版10.7.7在我這裡會莫名奇妙無視客戶端帶字幕視頻全部強制轉碼，10.8版沒有這個問題。
+    image: jellyfin/jellyfin:10.8.0-beta2
+    container_name: jellyfin
+    user: 1000:1000
+    network_mode: "host"
+    volumes:
+      - /docker/jellyfin/config:/config
+      - /docker/jellyfin/cache:/cache
+      - /mnt/bangumi:/bangumi:ro
+    restart: "unless-stopped"
+    # 我的ISP屏蔽了The Movies Database，所以需要設置代理
+    environment:
+      - HTTP_PROXY=http://127.0.0.1:8080
+      - HTTPS_PROXY=http://127.0.0.1:8080
+```
+運行容器
+```sh
+sudo docker-compose up
+```
 
 # Flatpak
 * https://wiki.archlinux.org/title/Flatpak
