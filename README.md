@@ -25,7 +25,12 @@
   - [OneDrive](#onedrive)
   - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
+  - [Jellyfin Media Player](#jellyfin-media-player)
 - [常用軟件](#常用軟件)
+- [遊戲相關](#遊戲相關)
+  - [Steam](#steam)
+  - [顯卡直通給Windows Guest虛擬機](#顯卡直通給windows-guest虛擬機)
+    - [前期準備](#前期準備)
 
 ---
 
@@ -146,7 +151,8 @@ sudo systemctl disable systemd-networkd.service systemd-resolved.service
 ```sh
 yay -S ttf-dejavu \
        noto-fonts-cjk noto-fonts-emoji noto-fonts \
-       wqy-microhei
+       wqy-microhei \
+       ttf-sarasa-gothic
 ```
 
 ## 安裝KDE
@@ -158,7 +164,7 @@ yay -S ttf-dejavu \
 * `plasma-pa`和`plasma-nm`用於PulseAudio和NetworkManager的組件
 * `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
 ```sh
-yay -S plasma-desktop kde-applications-meta \
+yay -S plasma-meta kde-applications-meta \
        plasma-pa plasma-nm \
        sddm sddm-kcm \
        kde-gtk-config breeze-gtk \
@@ -173,7 +179,7 @@ sudo systemctl enable sddm.service
 ```sh
 yay -S fcitx5-im fcitx5-rime fcitx5-mozc
 ```
-
+※ System Settings > Regional Settings > Input Method > Configure addons > 「經典用戶界面」旁邊的設置圖標 > 修改「字體」/「垂直候選列表」等，可以改變打字時選字的界面。
 
 # 配置桌面環境
 
@@ -184,14 +190,20 @@ LC_ALL=C xdg-user-dirs-update --force   # 使用英文名字創建
 ```
 
 ## 環境變量
-TODO
+KDE圖形環境自身使用的環境變量存放在`~/.config/plasma-workspace/env/`下。
+* [hidpi.sh](environment/hidpi.sh)
+* [firefox.sh](environment/firefox.sh)
+
+※ 可以使用`systemctl --user show-environment`來檢查是否生效。
+
+btw，臨時設置一個圖形環境可用的環境變量，可以用`systemctl --user set-environment <env>=<value>`
 
 ## HiDPI
 * https://wiki.archlinux.org/title/HiDPI#KDE_Plasma
 
 把`Force fonts DPI`改成`144`。等效於Windows下的150%縮放。
 
-設定環境變量`PLASMA_USE_QT_SCALING=1`，讓tray icons也遵循該縮放設定。
+※ 更多的HiDPI設置在上一章節的環境變量中。
 
 ## Firefox相關
 ```sh
@@ -206,7 +218,7 @@ firefox -P
 ```sh
 systemctl edit --user --force --full firefox@.service
 ```
-```systemd
+```ini
 [Unit]
 Description=Start firefox with the specified profile
 PartOf=graphical.target
@@ -225,8 +237,7 @@ systemctl start --user firefox@kaysiness.main
 ```
 
 
-# Zsh
-* https://wiki.archlinux.org/title/Zsh
+# [Zsh](https://wiki.archlinux.org/title/Zsh)
 ```sh
 yay -S zsh zsh-completions grml-zsh-config
 ```
@@ -280,8 +291,7 @@ sudo chown kaysiness:kaysiness -R /docker/jellyfin
 version: "3.5"
 services:
   jellyfin:
-    # 目前的穩定版10.7.7在我這裡會莫名奇妙無視客戶端帶字幕視頻全部強制轉碼，10.8版沒有這個問題。
-    image: jellyfin/jellyfin:10.8.0-beta2
+    image: jellyfin/jellyfin:latest
     container_name: jellyfin
     user: 1000:1000
     network_mode: "host"
@@ -300,12 +310,41 @@ services:
 sudo docker-compose up
 ```
 
-# Flatpak
-* https://wiki.archlinux.org/title/Flatpak
+# [Flatpak](https://wiki.archlinux.org/title/Flatpak)
 ```sh
 yay -S flatpak
 ```
+## [Jellyfin Media Player](https://flathub.org/apps/details/com.github.iwalton3.jellyfin-media-player)
+```sh
+flatpak install flathub com.github.iwalton3.jellyfin-media-player
+```
+
+※ 設置單獨的環境變量，讓程序使用指定的DPI值顯示。
+```sh
+flatpak override --user --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfin-media-player
+```
+
 
 # 常用軟件
 * Visual Studio Code：`yay -S vscodium libdbusmenu-glib`
 * XnView MP：`yay -S xnviewmp-system-libs`
+
+# 遊戲相關
+## Steam
+```sh
+flatpak install flathub com.valvesoftware.Steam
+
+# 讓Steam能訪問到其他位置上的遊戲庫
+flatpak override com.valvesoftware.Steam --filesystem=/path/to/directory
+
+# 解決字體問題
+flatpak override com.valvesoftware.Steam --filesystem=~/.local/share/fonts --filesystem=~/.config/fontconfig
+```
+
+
+## 顯卡直通給Windows Guest虛擬機
+* https://wiki.archlinux.org/title/PCI_passthrough_via_OVMF
+
+### 前期準備
+* 主板BIOS開啟iommu和虛擬化
+* 
