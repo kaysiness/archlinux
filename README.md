@@ -312,7 +312,7 @@ sudo docker-compose up
 ```
 
 # [Flatpak](https://wiki.archlinux.org/title/Flatpak)
-
+※ 一般情況下，本章節所有的`flatpak`命令都是以普通權限用戶運行，相當於`flatpak --user <command>`。
 ```sh
 yay -S flatpak
 ```
@@ -320,8 +320,8 @@ yay -S flatpak
 對Flatpak進行一些設定
 ```sh
 # 設定默認語言
-flatpak config --user --set languages 'en;zh'
-flatpak config --user --set extra-languages 'zh_CN.UTF-8;zh_TW.UTF-8'
+flatpak config --set languages 'en;zh'
+flatpak config --set extra-languages 'zh_CN.UTF-8;zh_TW.UTF-8'
 ```
 
 ## [Jellyfin Media Player](https://flathub.org/apps/details/com.github.iwalton3.jellyfin-media-player)
@@ -331,7 +331,7 @@ flatpak install flathub com.github.iwalton3.jellyfin-media-player
 
 ※ 設置單獨的環境變量，讓程序使用指定的DPI值顯示。
 ```sh
-flatpak override --user --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfin-media-player
+flatpak override --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfin-media-player
 ```
 
 ## 其他各種會用到的軟件
