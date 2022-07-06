@@ -26,6 +26,7 @@
   - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
   - [Jellyfin Media Player](#jellyfin-media-player)
+  - [其他各種會用到的軟件](#其他各種會用到的軟件)
 - [常用軟件](#常用軟件)
 - [遊戲相關](#遊戲相關)
   - [Steam](#steam)
@@ -311,9 +312,18 @@ sudo docker-compose up
 ```
 
 # [Flatpak](https://wiki.archlinux.org/title/Flatpak)
+
 ```sh
 yay -S flatpak
 ```
+
+對Flatpak進行一些設定
+```sh
+# 設定默認語言
+flatpak config --user --set languages 'en;zh'
+flatpak config --user --set extra-languages 'zh_CN.UTF-8;zh_TW.UTF-8'
+```
+
 ## [Jellyfin Media Player](https://flathub.org/apps/details/com.github.iwalton3.jellyfin-media-player)
 ```sh
 flatpak install flathub com.github.iwalton3.jellyfin-media-player
@@ -324,10 +334,15 @@ flatpak install flathub com.github.iwalton3.jellyfin-media-player
 flatpak override --user --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfin-media-player
 ```
 
+## 其他各種會用到的軟件
+* LibreOffice：`flatpak install flathub org.libreoffice.LibreOffice`
+* ~~qView：`flatpak install flathub com.interversehq.qView`~~
+* Visual Studio Code：`flatpak install flathub com.visualstudio.code`
 
 # 常用軟件
-* Visual Studio Code：`yay -S vscodium libdbusmenu-glib`
+* ~~Visual Studio Code：`yay -S vscodium libdbusmenu-glib`~~
 * XnView MP：`yay -S xnviewmp-system-libs`
+* qView：`yay -S qview`
 
 # 遊戲相關
 ## Steam
