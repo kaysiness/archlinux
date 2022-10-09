@@ -247,7 +247,7 @@ systemctl start --user firefox@kaysiness.main
 ```sh
 yay -S zsh zsh-completions grml-zsh-config
 ```
-TODO
+直接抄安裝嚮導的[.zshrc](zsh/zshrc)，方便快捷🙃
 
 
 # Docker
