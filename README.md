@@ -32,6 +32,11 @@
   - [Steam](#steam)
   - [顯卡直通給Windows Guest虛擬機](#顯卡直通給windows-guest虛擬機)
     - [前期準備](#前期準備)
+      - [找出並記下IOMMU分組](#找出並記下iommu分組)
+    - [隔離GPU](#隔離gpu)
+    - [安裝必要軟體](#安裝必要軟體)
+    - [安裝Windows 10](#安裝windows-10)
+    - [修改Windows 10的虛擬設定](#修改windows-10的虛擬設定)
 
 ---
 
@@ -354,12 +359,208 @@ flatpak override com.valvesoftware.Steam --filesystem=/path/to/directory
 
 # 解決字體問題
 flatpak override com.valvesoftware.Steam --filesystem=~/.local/share/fonts --filesystem=~/.config/fontconfig
+
+# HiDPI縮放
+flatpak override com.valvesoftware.Steam --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 --env=GDK_SCALE=2
+
+# 代理(但應該是不起作用的)
+flatpak override com.valvesoftware.Steam --env=HTTP_PROXY=http://127.0.0.1:8080 --env=HTTPS_PROXY=http://127.0.0.1:8080
 ```
 
 
 ## 顯卡直通給Windows Guest虛擬機
 * https://wiki.archlinux.org/title/PCI_passthrough_via_OVMF
+* https://doowzs.com/posts/2021/04/rtx-vfio-passthrough/
 
 ### 前期準備
-* 主板BIOS開啟iommu和虛擬化
-* 
+* 主板BIOS開啟iommu和CPU虛擬化
+* 我的硬體為
+  * CPU: AMD Ryzen 7 5700G with Radeon Graphics
+  * GPU: GeForce GTX 960
+  * MEM: 32GB
+
+※ 此處是把GTX 960直通給虛擬機
+
+#### [找出並記下IOMMU分組](https://wiki.archlinux.org/title/PCI_passthrough_via_OVMF#Ensuring_that_the_groups_are_valid)
+```sh
+#!/bin/bash
+shopt -s nullglob
+for g in $(find /sys/kernel/iommu_groups/* -maxdepth 0 -type d | sort -V); do
+    echo "IOMMU Group ${g##*/}:"
+    for d in $g/devices/*; do
+        echo -e "\t$(lspci -nns ${d##*/})"
+    done;
+done;
+```
+執行上面的腳本，找到顯卡所對應的設備ID
+```
+IOMMU Group 10:
+        01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GM206 [GeForce GTX 960] [10de:1401] (rev a1)
+        01:00.1 Audio device [0403]: NVIDIA Corporation GM206 High Definition Audio Controller [10de:0fba] (rev a1)
+```
+這裡是`10de:1401`和`10de:0fba`
+
+### 隔離GPU
+編輯`/etc/default/grub`，修改`GRUB_CMDLINE_LINUX_DEFAULT`的值，添加上設備ID
+```sh
+GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet iommu=pt vfio-pci.ids=10de:1401,10de:0fba"
+```
+
+重新生成`grub.cfg`
+```sh
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+提前加载`vfio-pci`內核模塊。編輯`/etc/mkinitcpio.conf`
+```sh
+MODULES=(vfio_pci vfio vfio_iommu_type1 vfio_virqfd)
+```
+
+重新生成mkinitcpio
+```sh
+sudo mkinitcpio -P
+```
+
+以上都完成後，重啟電腦
+
+執行`lspci -nnv`，如果內核驅動顯示為`vfio-pci`則成功了
+```sh
+01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GM206 [GeForce GTX 960] [10de:1401] (rev a1) (prog-if 00 [VGA controller])
+        Subsystem: ASUSTeK Computer Inc. Device [1043:8520]
+        Flags: bus master, fast devsel, latency 0, IRQ 82, IOMMU group 10
+        Memory at f5000000 (32-bit, non-prefetchable) [size=16M]
+        Memory at c0000000 (64-bit, prefetchable) [size=256M]
+        Memory at d0000000 (64-bit, prefetchable) [size=32M]
+        I/O ports at f000 [size=128]
+        Expansion ROM at f6000000 [disabled] [size=512K]
+        Capabilities: <access denied>
+        Kernel driver in use: vfio-pci
+        Kernel modules: nouveau
+```
+
+### 安裝必要軟體
+```sh
+yay -S libvirt virt-manager \
+       iptables-nft dnsmasq dmidecode \ # NAT網絡所需組件
+       qemu-base \
+       edk2-ovmf \
+       samba # 如果需要共享檔案給虛擬機，需要用到SMB
+
+# 把當前用戶添加到libvirt組，可讓每次打開virt-manager時不需要密碼
+sudo gpasswd -a kaysiness libvirt
+
+# 啟用相應Deamon
+sudo systemctl enable --now libvirtd.service
+```
+
+注意事項：  
+* 默認的NAT網絡`default`預設是不啟用的，以下命令可以設定為開機啟用和立即啟用網絡
+  * `sudo virsh net-autostart default`
+  * `sudo virsh net-start default`
+
+### 安裝Windows 10
+
+注意事項：
+* 芯片組選`Q35`，固件選`UEFI x86_64: /usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.fd`
+* CPU類型選`host-passthrough`
+* 其他保持默認，先把系統安裝好後在添加直通顯卡進去
+
+安裝完成後關閉虛擬機
+
+### 修改Windows 10的虛擬設定
+因為NVIDIA的驅動會檢查是否是虛擬機環境，所有要進行隱藏  
+※ 以下這個XML內容都可以在`virt-manager`裡編輯
+```xml
+<features>
+  <hyperv mode="custom">
+    <vendor_id state="on" value="4cc49aed5d33"/>
+    ......
+  </hyperv>
+  <kvm>
+    <hidden state="on"/>
+  </kvm>
+  ......
+</features>
+```
+
+在`virt-manager`裡把舊的虛擬硬解刪除，並把GTX 960和鼠標鍵盤加上去。
+
+我是喜歡Host OS和Guest OS共用一套鼠標鍵盤，好處是不用額外把一組USB控制器分給虛擬機，只需要同時按住左右兩個Ctrl鍵即可在兩套OS之間切換。
+
+首先查看鼠標鍵盤的設備路徑，執行`ls -l /dev/input/by-id/`，我的輸出結果如下
+```
+drwxr-xr-x  - root 07-06 11:05 /dev/input/by-id
+lrwxrwxrwx 10 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-event-if01 -> ../event10
+lrwxrwxrwx 10 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-event-if02 -> ../event12
+lrwxrwxrwx  9 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-event-kbd -> ../event8
+lrwxrwxrwx  9 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-if01-event-mouse -> ../event9
+lrwxrwxrwx  9 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-if01-mouse -> ../mouse0
+lrwxrwxrwx 10 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-if02-event-kbd -> ../event11
+lrwxrwxrwx  9 root 07-06 11:05 ├── usb-USB_Keyboard_USB_Keyboard_C104A000000A-event-if01 -> ../event7
+lrwxrwxrwx  9 root 07-06 11:05 └── usb-USB_Keyboard_USB_Keyboard_C104A000000A-event-kbd -> ../event6
+```
+正確的路徑是帶有event值這些，我這裡是`event9`和`event6`
+
+然後增加以下的內容。PS2管線的那一套虛擬鼠標鍵盤是不能刪除的，保留即可
+```xml
+<devices>
+  ......
+  <input type="evdev">
+    <source dev="/dev/input/by-id/usb-Microsoft_Microsoft&#xAE;_2.4GHz_Transceiver_v8.0-if01-event-mouse"/>
+  </input>
+  <input type="evdev">
+    <source dev="/dev/input/by-id/usb-USB_Keyboard_USB_Keyboard_C104A000000A-event-kbd" grab="all" repeat="on"/>
+  </input>
+  <input type="mouse" bus="ps2"/>
+  <input type="keyboard" bus="ps2"/>
+  ......
+</devices> 
+```
+
+編輯`default`網絡，給虛擬機分配一個固定IP地址
+```xml
+<network connections="1">
+  <name>default</name>
+  <uuid>2928a687-370c-4f94-99c3-459c749fe47c</uuid>
+  <forward mode="nat">
+    <nat>
+      <port start="1024" end="65535"/>
+    </nat>
+  </forward>
+  <bridge name="virbr0" stp="on" delay="0"/>
+  <mac address="52:54:00:16:7c:1b"/>
+  <ip address="192.168.122.1" netmask="255.255.255.0">
+    <dhcp>
+      <range start="192.168.122.2" end="192.168.122.254"/>
+      <host mac="52:54:00:59:8d:9a" name="win10" ip="192.168.122.10"/>
+    </dhcp>
+  </ip>
+</network>
+```
+
+給虛擬機添加各種協議的端口映射
+```sh
+sudo mkdir /etc/libvirt/hooks
+
+sudo vim /etc/libvirt/hooks/qemu
+#!/bin/bash
+if [ "${1}" = "win10" ]; then # 修改为虚拟机的名称
+   GUEST_IP=192.168.122.10 # 填入Windows虚拟机的IP地址
+   for PORT in 3389 47984 47989 48010 47998 47999 48000; do
+     if [ "${2}" = "stopped" ] || [ "${2}" = "reconnect" ]; then
+        /sbin/iptables -D FORWARD -o virbr0 -p tcp -d $GUEST_IP --dport $PORT -j ACCEPT
+        /sbin/iptables -t nat -D PREROUTING -p tcp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
+        /sbin/iptables -D FORWARD -o virbr0 -p udp -d $GUEST_IP --dport $PORT -j ACCEPT
+        /sbin/iptables -t nat -D PREROUTING -p udp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
+     fi
+     if [ "${2}" = "start" ] || [ "${2}" = "reconnect" ]; then
+        /sbin/iptables -I FORWARD -o virbr0 -p tcp -d $GUEST_IP --dport $PORT -j ACCEPT
+        /sbin/iptables -t nat -I PREROUTING -p tcp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
+        /sbin/iptables -I FORWARD -o virbr0 -p udp -d $GUEST_IP --dport $PORT -j ACCEPT
+        /sbin/iptables -t nat -I PREROUTING -p udp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
+     fi
+   done
+fi
+
+sudo chmod +x /etc/libvirt/hooks/qemu
+```
