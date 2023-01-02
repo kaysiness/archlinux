@@ -9,7 +9,7 @@
     - [更換源](#更換源)
 - [安裝桌面環境](#安裝桌面環境)
   - [安裝Xorg和顯卡驅動](#安裝xorg和顯卡驅動)
-  - [PulseAudio](#pulseaudio)
+  - [PipeWire](#pipewire)
   - [NetworkManager](#networkmanager)
   - [字體](#字體)
   - [安裝KDE](#安裝kde)
@@ -25,8 +25,10 @@
   - [OneDrive](#onedrive)
   - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
-  - [Jellyfin Media Player](#jellyfin-media-player)
+  - [解決字體問題](#解決字體問題)
   - [其他各種會用到的軟件](#其他各種會用到的軟件)
+    - [XnViewMP](#xnviewmp)
+    - [Jellyfin Media Player](#jellyfin-media-player)
 - [常用軟件](#常用軟件)
 - [遊戲相關](#遊戲相關)
   - [Steam](#steam)
@@ -139,9 +141,11 @@ yay -S xorg-server xf86-video-amdgpu \
        vulkan-radeon
 ```
 
-## PulseAudio
+## PipeWire
 ```sh
-yay -S pulseaudio pulseaudio-alsa
+yay -S pipewire pipewire-alsa pipewire-pulse
+sudo systemctl enable pipewire-pulse.socket
+systemctl --user enable pipewire-pulse.service
 ```
 
 ## NetworkManager
@@ -320,6 +324,7 @@ sudo docker-compose up
 ※ 一般情況下，本章節所有的`flatpak`命令都是以普通權限用戶運行，相當於`flatpak --user <command>`。
 ```sh
 yay -S flatpak
+sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
 對Flatpak進行一些設定
@@ -327,27 +332,71 @@ yay -S flatpak
 # 設定默認語言
 flatpak config --set languages 'en;zh'
 flatpak config --set extra-languages 'zh_CN.UTF-8;zh_TW.UTF-8'
+
+# 修改源
+# ref: https://mirror.sjtu.edu.cn/docs/flathub
+sudo flatpak remote-modify flathub --url=https://mirror.sjtu.edu.cn/flathub
+
+# 添加Beta源
+
 ```
 
-## [Jellyfin Media Player](https://flathub.org/apps/details/com.github.iwalton3.jellyfin-media-player)
+常用指令
 ```sh
-flatpak install flathub com.github.iwalton3.jellyfin-media-player
+# 删除软件并清除数据
+flatpak uninstall --delete-data <app>
+
+# 查看软件的权限
+flatpak info --show-permissions <app>
+
+# 覆盖默认权限
+flatpak override --filesystem=/mnt[:ro] <app>
+flatpak override --nofilesystem=/mnt <app>
+
+# 重设为默认的权限
+flatpak override --reset <app>
 ```
 
-※ 設置單獨的環境變量，讓程序使用指定的DPI值顯示。
+## 解決字體問題
 ```sh
-flatpak override --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfin-media-player
+flatpak override <app> --filesystem=~/.local/share/fonts:ro --filesystem=~/.config/fontconfig:ro
+ln -sf ~/.config/fontconfig ~/.var/app/<app>/config
+
+#如果安裝的App多的話，也可以使用以下指令批量完成
+sudo flatpak override --system --filesystem=~/.local/share/fonts:ro --filesystem=~/.config/fontconfig:ro
+for app in ~/.var/app/*; do
+  ln -s ~/.config/fontconfig ~/.var/app/$app/config
+done
 ```
+
 
 ## 其他各種會用到的軟件
 * LibreOffice：`flatpak install flathub org.libreoffice.LibreOffice`
 * ~~qView：`flatpak install flathub com.interversehq.qView`~~
 * Visual Studio Code：`flatpak install flathub com.visualstudio.code`
 
+### XnViewMP
+```sh
+flatpak install flathub com.xnview.XnViewMP
+
+# 如果照片、视频都是存放在 /mnt,/media 这些目录，不能使用只读挂载--filesystem=/mnt:ro，否则XnView的OpenWith功能无法使用
+flatpak override com.xnview.XnViewMP --filesystem=/mnt
+```
+
+### [Jellyfin Media Player](https://flathub.org/apps/details/com.github.iwalton3.jellyfin-media-player)
+```sh
+flatpak install flathub com.github.iwalton3.jellyfin-media-player
+
+# 設置單獨的環境變量，讓程序使用指定的DPI值顯示。
+flatpak override --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfin-media-player
+```
+  
+
 # 常用軟件
 * ~~Visual Studio Code：`yay -S vscodium libdbusmenu-glib`~~
-* XnView MP：`yay -S xnviewmp-system-libs`
+* ~~XnView MP：`yay -S xnviewmp-system-libs`~~
 * qView：`yay -S qview`
+
 
 # 遊戲相關
 ## Steam
@@ -356,9 +405,6 @@ flatpak install flathub com.valvesoftware.Steam
 
 # 讓Steam能訪問到其他位置上的遊戲庫
 flatpak override com.valvesoftware.Steam --filesystem=/path/to/directory
-
-# 解決字體問題
-flatpak override com.valvesoftware.Steam --filesystem=~/.local/share/fonts --filesystem=~/.config/fontconfig
 
 # HiDPI縮放
 flatpak override com.valvesoftware.Steam --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 --env=GDK_SCALE=2
