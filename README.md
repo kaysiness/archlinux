@@ -22,6 +22,7 @@
     - [使用systemd啓動Firefox](#使用systemd啓動firefox)
 - [Zsh](#zsh)
 - [Docker](#docker)
+  - [创建给容器用的Macvlan网络](#创建给容器用的macvlan网络)
   - [OneDrive](#onedrive)
   - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
@@ -264,6 +265,32 @@ sudo systemctl enable docker.service
 sudo mkdir /docker
 ```
 
+## 创建给容器用的Macvlan网络
+```sh
+sudo docker network create -d macvlan --subnet=10.0.0.0/24 --gateway=10.0.0.2 --aux-address="router=10.0.0.1" -o parent=enp5s0 home
+
+# --subnet=10.0.0.0/24  使新建的Macvlan网段和真实局域网段相同
+# --gateway=10.0.0.2    网关
+# --aux-address=""      让DHCP不分配的IP地址，可以设置多个--aux-address=""，但我的建议是加入这个home网络的容器全部分配静态IP地址。
+```
+
+※ 加入home网络的容器手动指定IP地址
+```yml
+version: "3.6"
+services:
+  service_name:
+    environment:
+      - 'ServerIP=10.0.0.50'
+    networks:
+      home:
+        ipv4_address: 10.0.0.50
+
+networks:
+  home:
+    external: true
+    name: home
+```
+
 ## OneDrive
 * https://github.com/abraunegg/onedrive/blob/master/docs/Docker.md
 ```sh
@@ -298,22 +325,42 @@ sudo chown kaysiness:kaysiness -R /docker/jellyfin
 ```
 新建`docker-compose.yml`文件
 ```yml
-version: "3.5"
+version: "3.6"
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
     user: 1000:1000
-    network_mode: "host"
-    volumes:
-      - /docker/jellyfin/config:/config
-      - /docker/jellyfin/cache:/cache
-      - /mnt/bangumi:/bangumi:ro
     restart: "unless-stopped"
-    # 我的ISP屏蔽了The Movies Database，所以需要設置代理
     environment:
-      - HTTP_PROXY=http://127.0.0.1:8080
-      - HTTPS_PROXY=http://127.0.0.1:8080
+      - 'ServerIP=10.0.0.50'
+      - 'TZ=Asia/Shanghai'
+    expose:
+      - 8096
+    networks:
+      home:
+        ipv4_address: 10.0.0.50
+    volumes:
+      - '/docker/jellyfin/data/config:/config'
+      - '/docker/jellyfin/data/cache:/cache'
+      - '/usr/share/fonts/noto-cjk:/usr/share/fonts:ro'
+      - '/home/kaysiness/.local/share/fonts:/config/fonts:ro'
+      - '/dev/shm/jellyfinTranscodecs:/config/transcodes'
+    devices:
+      # VAAPI Devices
+      - '/dev/dri/renderD128:/dev/dri/renderD128'
+      - '/dev/dri/card0:/dev/dri/card0'
+    group_add:
+      # VAAPI 还需要把render组添加到docker权限，该组ID可以在/etc/group查看
+      - '989'
+    labels:
+      # containrrr/watchtower自动更新
+      - com.centurylinklabs.watchtower.enable=true
+
+networks:
+  home:
+    external: true
+    name: home
 ```
 運行容器
 ```sh
