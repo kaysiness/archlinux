@@ -23,6 +23,7 @@
 - [Zsh](#zsh)
 - [Docker](#docker)
   - [创建给容器用的Macvlan网络](#创建给容器用的macvlan网络)
+  - [使用nginx-proxy给容器服务做反代](#使用nginx-proxy给容器服务做反代)
   - [OneDrive](#onedrive)
   - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
@@ -290,6 +291,72 @@ networks:
     external: true
     name: home
 ```
+
+## 使用nginx-proxy给容器服务做反代
+```yml
+version: '3.6'
+services:
+  nginx-proxy:
+    image: 'jwilder/nginx-proxy:latest'
+    container_name: nginx-proxy
+    restart: 'unless-stopped'
+    volumes:
+      - '/var/run/docker.sock:/tmp/docker.sock:ro'
+      - '/docker/nginx-proxy/certs:/etc/nginx/certs:ro'
+    environment:
+      - 'HTTP_PORT=80'
+      - 'HTTPS_PORT=443'
+    network_mode: bridge
+    ports:
+      - '10.0.0.10:80:80'
+      - '10.0.0.10:443:443'
+
+  acme.sh:
+    image: 'neilpang/acme.sh:latest'
+    container_name: acme.sh
+    command: 'daemon'
+    restart: 'unless-stopped'
+    volumes:
+      - '/docker/nginx-proxy/acme.sh:/acme.sh'
+      - '/docker/nginx-proxy/certs:/certs'
+      #- '/var/run/docker.sock:/var/run/docker.sock'
+    environment:
+      - 'CF_Token=<CF_TOKEN>'
+    network_mode: bridge
+
+```
+
+```sh
+# 申请证书
+sudo docker exec acme.sh --register-account -m <email>
+sudo docker exec acme.sh --issue --dns dns_cf -k ec-256 -d *.example.com
+
+# 安装证书给nginx-proxy使用
+# 如果申请的是泛域名证书，安装时别写前面的<*.>，否则nginx-proxy不能正确读取证书
+sudo docker exec acme.sh --install-cert --ecc -d "*.example.com" --key-file /certs/example.com.key --fullchain-file /certs/example.com.crt
+
+# 续期证书(一般acme.sh会自动续期)
+sudo docker exec acme.sh --renew --dns dns_cf --ecc -d *.example.com
+
+# 吊销证书
+sudo docker exec acme.sh --revoke --ecc -d *.example.com
+```
+
+之后只要在启动容器时把想要的域名绑定好即可，例如
+```yml
+version: "3.6"
+services:
+  jellyfin:
+    environment:
+      - 'VIRTUAL_HOST=jellyfin.example.com'
+      - 'VIRTUAL_PORT=8096'
+      - 'VIRTUAL_PATH=/'
+    expose:
+      - 8096
+```
+
+※ 还需要在DNS服务器或者/etc/hosts上把容器的域名`jellyfin.example.com`绑定到`10.0.0.10`上。
+
 
 ## OneDrive
 * https://github.com/abraunegg/onedrive/blob/master/docs/Docker.md
