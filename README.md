@@ -604,9 +604,18 @@ done
 
 
 ## 其他各種會用到的軟件
-* LibreOffice：`flatpak install flathub org.libreoffice.LibreOffice`
-* ~~qView：`flatpak install flathub com.interversehq.qView`~~
-* Visual Studio Code：`flatpak install flathub com.visualstudio.code`
+| 名字                  | 命令                                                    |
+| --------------------- | ------------------------------------------------------- |
+| ~~LibreOffice~~       | `flatpak install flathub org.libreoffice.LibreOffice`   |
+| ONLYOFFICE            | `flatpak install flathub org.onlyoffice.desktopeditors` |
+| Visual Studio Code    | `flatpak install flathub com.visualstudio.code`         |
+| Flatseal              | `flatpak install falthub com.github.tchx84.Flatseal`    |
+| Google Chrome         | `flatpak install flathub com.google.Chrome`             |
+| Microsoft Edge        | `flatpak install flathub com.microsoft.Edge`            |
+| Lutris                | `flatpak install flathub net.lutris.Lutris`             |
+| ProtonUp-Qt           | `flatpak install flathub net.davidotek.pupgui2`         |
+| Heroic Games Launcher | `flatpak install flathub com.heroicgameslauncher.hgl`   |
+| Chiaki                | `flatpak install flathub re.chiaki.Chiaki`              |
 
 ### XnViewMP
 ```sh
@@ -626,9 +635,11 @@ flatpak override --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfi
   
 
 # 常用軟件
-* ~~Visual Studio Code：`yay -S vscodium libdbusmenu-glib`~~
-* ~~XnView MP：`yay -S xnviewmp-system-libs`~~
-* qView：`yay -S qview`
+| 名字                   | 命令                               |
+| ---------------------- | ---------------------------------- |
+| ~~Visual Studio Code~~ | `yay -S vscodium libdbusmenu-glib` |
+| XnView MP              | `yay -S xnviewmp-system-libs`      |
+| qView                  | `yay -S qview`                     |
 
 
 # 遊戲相關
