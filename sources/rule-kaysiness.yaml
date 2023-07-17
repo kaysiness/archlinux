@@ -1,0 +1,187 @@
+payload:
+  # ----------目的域名后缀规则----------
+  #- DOMAIN-SUFFIX,ad.com,REJECT
+  #- DOMAIN-SUFFIX,bilibili.com,DIRECT,tcp   #【Meta专属】可指定协议类型(tcp/udp)
+  #- DOMAIN-SUFFIX,omdbapi.com,proxy
+  - DOMAIN-SUFFIX,mikanani.me,proxy
+  - DOMAIN-SUFFIX,flathub.org,proxy
+  - DOMAIN-SUFFIX,apkcombo.com,proxy
+  - DOMAIN-SUFFIX,onenote.com,proxy
+  - DOMAIN-SUFFIX,psnprofiles.com,proxy
+  - DOMAIN-SUFFIX,braintreegateway.com,proxy  # PSNProfiles
+  - DOMAIN-SUFFIX,bestdori.com,proxy
+  - DOMAIN-SUFFIX,2dfan.com,proxy
+  #- DOMAIN-SUFFIX,duolingo.com,proxy # 走代理的话做紫色练习需要花代币
+  - DOMAIN-SUFFIX,threads.net,proxy
+  - DOMAIN-SUFFIX,microsofttranslator.com,proxy # Edge自带的翻译
+  - DOMAIN-SUFFIX,packages.microsoft.com,proxy # flatpak Edge更新地址
+
+  # ----------特殊規則----------
+  #- DOMAIN-SUFFIX,cn.bing.com,DIRECT
+  - DOMAIN-SUFFIX,bing.com,proxy
+  #- DOMAIN,ip.sb,relay-senloo-vultr
+  - DOMAIN,downloads.vivaldi.com,proxy
+  - DOMAIN,download.xnview.com,proxy
+  - DOMAIN,cdnjs.cloudflare.com,proxy
+  - DOMAIN,fonts.googleapis.com,proxy
+  - DOMAIN,addons.mozilla.org,proxy
+  #- DOMAIN,telemetry-console.api.playstation.com,proxy  # 遥测URI，可能是用于验证账户是否在线
+
+  # ----------短链接----------
+  - DOMAIN,ift.tt,proxy
+  - DOMAIN,bit.ly,proxy
+  - DOMAIN,buff.ly,proxy
+
+  # ----------JP----------
+  - GEOSITE,amazon,jp-sl
+  - GEOSITE,pixiv,jp-sl
+  - GEOSITE,yahoo,jp-sl
+  - DOMAIN-SUFFIX,mona.do,jp-sl
+  - DOMAIN-SUFFIX,dvd.chat,jp-sl
+  - DOMAIN-SUFFIX,dvd.moe,jp-sl
+  - DOMAIN-SUFFIX,misskey.io,jp-sl
+  - DOMAIN-SUFFIX,bgm.tv,jp-sl
+
+  # ----------AD----------
+  - DOMAIN,ntp.msn.cn,REJECT
+
+  # ----------Spotify---------- 听歌直连，其他代理
+  # - DOMAIN-SUFFIX,scdn.co,DIRECT
+  # - DOMAIN-SUFFIX,pscdn.co,DIRECT
+  # - DOMAIN,spclient.wg.spotify.com,DIRECT
+  # - DOMAIN,gae2-spclient.spotify.com,DIRECT
+  # - DOMAIN,api.spotify.com,DIRECT
+  # - DOMAIN,api-partner.spotify.com,DIRECT
+  # - GEOSITE,spotify,jp-sl
+  - DOMAIN,open.spotify.com,jp-sl
+  - DOMAIN,audio-ak-spotify-com.akamaized.net,DIRECT
+  - GEOSITE,spotify,DIRECT
+
+  # ----------目的域名关键字规则----------
+  #- DOMAIN-KEYWORD,google,proxy
+
+  # ----------目的IP规则----------
+  #- IP-CIDR,127.0.0.0/8,DIRECT
+  #- IP-CIDR,122.122.0.0/8,DIRECT,no-resolve #no-resolve:不解析，可应用于GEOIP, IP-CIDR
+
+  # ----------来源IP规则----------
+  #- SRC-IP-CIDR,192.168.1.201/32,DIRECT
+
+  # ----------目的端口规则----------
+  - DST-PORT,123/136/137-139,DIRECT         #【Meta专属】可指定端口范围
+
+  # ----------来源端口规则----------
+  - SRC-PORT,123/136/137-139,DIRECT,udp     #【Meta专属】可指定端口范围
+
+  # ----------【Meta专属】逻辑判断规则----------
+  #- AND,((DOMAIN,baidu.com),(NETWORK,UDP)),DIRECT #AND(和):域名为baidu.com的UDP协议
+  #- OR,((NETWORK,UDP),(DOMAIN,baidu.com)),REJECT  #OR(或):UDP的协议，或者域名为baidu.com
+  #- NOT,((DOMAIN,baidu.com)),proxy                #NOT(否)：域名不为baidu.com访问
+  #域名关键词为bilibili或者douyu的UDP协议
+  - AND,((OR,((DOMAIN-KEYWORD,bilibili),(DOMAIN-KEYWORD,douyu))),(NETWORK,UDP)),REJECT
+
+  # ----------【Meta专属】GEOSITE规则----------
+  - GEOSITE,category-ads-all,REJECT
+  - GEOSITE,category-games@cn,DIRECT
+  - GEOSITE,icloud@cn,DIRECT
+  - GEOSITE,apple@cn,DIRECT
+  - GEOSITE,apple-cn,DIRECT
+  - GEOSITE,microsoft@cn,DIRECT
+  - GEOSITE,amazon@cn,DIRECT
+  #- GEOSITE,google@cn,DIRECT
+  #- GEOSITE,google-cn,DIRECT
+  - GEOSITE,google,proxy
+  - GEOSITE,android,proxy
+  - GEOSITE,twitter,proxy
+  - GEOSITE,youtube,proxy
+  - GEOSITE,facebook,proxy
+  - GEOSITE,feedly,proxy
+  - GEOSITE,github,proxy
+  - GEOSITE,imgur,proxy
+  - GEOSITE,telegram,proxy
+  - GEOSITE,apkpure,proxy
+  - GEOSITE,ehentai,proxy
+  - GEOSITE,tmdb,proxy
+  - GEOSITE,tvdb,proxy
+  - GEOSITE,bahamut,proxy
+
+  # ----------Steam相关----------
+  #Steam的国外下载CDN，一般不需要设置，这里只是以防万一
+  - DOMAIN-SUFFIX,steamcontent.com,DIRECT
+  #以下域名/IP不走代理，可以让Steam使用国内的下载CDN。ref:https://www.dogfight360.com/blog/knowledge-base/fix_steamdl_region/
+  - DOMAIN,api.steampowered.com,DIRECT
+  - DOMAIN-SUFFIX,cm.steampowered.com,DIRECT
+  - DOMAIN-SUFFIX,steamserver.net,DIRECT
+  - IP-CIDR,103.10.124.0/24,DIRECT,no-resolve
+  - IP-CIDR,103.10.125.0/24,DIRECT,no-resolve
+  - IP-CIDR,103.28.54.0/24,DIRECT,no-resolve
+  - IP-CIDR,146.66.152.0/24,DIRECT,no-resolve
+  - IP-CIDR,146.66.155.0/24,DIRECT,no-resolve
+  - IP-CIDR,153.254.86.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.224.0/23,DIRECT,no-resolve
+  - IP-CIDR,155.133.226.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.227.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.230.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.232.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.233.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.234.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.236.0/23,DIRECT,no-resolve
+  - IP-CIDR,155.133.238.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.239.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.240.0/23,DIRECT,no-resolve
+  - IP-CIDR,155.133.245.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.246.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.248.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.249.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.250.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.251.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.252.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.253.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.254.0/24,DIRECT,no-resolve
+  - IP-CIDR,155.133.255.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.192.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.193.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.194.0/23,DIRECT,no-resolve
+  - IP-CIDR,162.254.195.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.196.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.197.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.198.0/24,DIRECT,no-resolve
+  - IP-CIDR,162.254.199.0/24,DIRECT,no-resolve
+  - IP-CIDR,185.25.182.0/24,DIRECT,no-resolve
+  - IP-CIDR,185.25.183.0/24,DIRECT,no-resolve
+  - IP-CIDR,190.217.33.0/24,DIRECT,no-resolve
+  - IP-CIDR,192.69.96.0/22,DIRECT,no-resolve
+  - IP-CIDR,205.185.194.0/24,DIRECT,no-resolve
+  - IP-CIDR,205.196.6.0/24,DIRECT,no-resolve
+  - IP-CIDR,208.64.200.0/24,DIRECT,no-resolve
+  - IP-CIDR,208.64.201.0/24,DIRECT,no-resolve
+  - IP-CIDR,208.64.202.0/24,DIRECT,no-resolve
+  - IP-CIDR,208.64.203.0/24,DIRECT,no-resolve
+  - IP-CIDR,208.78.164.0/22,DIRECT,no-resolve
+  #剩下的全走代理
+  - GEOSITE,steam,proxy
+
+  # ----------CDN----------
+  - DOMAIN-SUFFIX,discourse-cdn.com,proxy
+  - DOMAIN-SUFFIX,bootstrapcdn.com,proxy
+  - DOMAIN-SUFFIX,amazonaws.com,proxy
+  - DOMAIN-SUFFIX,cloudfront.net,proxy
+  - DOMAIN-SUFFIX,akamaihd.net,proxy
+  - DOMAIN-SUFFIX,akamaized.net,proxy
+  - DOMAIN-SUFFIX,bscstorage.net,proxy
+  - DOMAIN-SUFFIX,aspnetcdn.com,proxy
+  - DOMAIN-SUFFIX,azureedge.net,proxy
+  - DOMAIN-SUFFIX,lastfm.freetls.fastly.net,proxy
+
+  # ----------GFW規則----------
+  - GEOSITE,gfw,proxy
+  - GEOSITE,greatfire,proxy
+
+  # ----------CN域名/非CN域名----------
+  - GEOSITE,geolocation-cn,DIRECT
+  #- GEOSITE,geolocation-!cn,proxy
+
+  # ----------GEOIP规则----------
+  - GEOIP,telegram,proxy,no-resolve
+  - GEOIP,private,DIRECT,no-resolve
+  - GEOIP,cn,DIRECT

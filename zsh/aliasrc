@@ -1,0 +1,21 @@
+alias lg='exa --git --long'
+alias ll='exa --tree --level=2 --long --time-style=iso'
+alias la='exa --tree --level=2 --long --time-style=iso --all'
+alias rm='rm -i'
+alias cls='clear'
+alias df='duf'
+alias dig='dog A AAAA'
+alias nslookup='dig'
+alias cpr='rsync -avP'
+alias mvr='rsync -avP --remove-source-files'
+alias netstat='ss -aluntp'
+alias tracert='mtr'
+alias waifu4x='realesrgan-ncnn-vulkan -n realesrgan-x4plus-anime'
+
+# Proxy
+alias yt-dlp='yt-dlp --proxy=${HTTPS_PROXY} --cookies-from-browser firefox:${HOME}/.mozilla/firefox/${FF_PROFILE}/'
+alias curl='curl --proxy ${HTTPS_PROXY}'
+alias gallery-dl='gallery-dl --proxy ${HTTPS_PROXY}'
+
+# Gallery-dl alias
+alias yande.re='gallery-dl -f "/O" --filter "extension==png or extension==jpg"'

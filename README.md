@@ -1,12 +1,22 @@
+- [備份舊系統](#備份舊系統)
+  - [獲取已安裝的包名字](#獲取已安裝的包名字)
+  - [備份目錄](#備份目錄)
 - [安裝基本系統](#安裝基本系統)
   - [硬盤分區](#硬盤分區)
+    - [創建btrfs子卷](#創建btrfs子卷)
+    - [掛載分區](#掛載分區)
   - [安裝系統](#安裝系統)
+  - [修改配置文件](#修改配置文件)
+    - [/etc/mkinitcpio.conf](#etcmkinitcpioconf)
   - [安裝GRUB](#安裝grub)
   - [重啓前的準備](#重啓前的準備)
     - [新建普通用戶](#新建普通用戶)
     - [讓普通用戶使用sudo](#讓普通用戶使用sudo)
     - [啓用NTP矯時](#啓用ntp矯時)
     - [更換源](#更換源)
+  - [還原舊系統的備份](#還原舊系統的備份)
+- [Btrfs快照](#btrfs快照)
+  - [安裝grub-btrfs](#安裝grub-btrfs)
 - [安裝桌面環境](#安裝桌面環境)
   - [安裝Xorg和顯卡驅動](#安裝xorg和顯卡驅動)
   - [PipeWire](#pipewire)
@@ -44,6 +54,22 @@
 
 ---
 
+# 備份舊系統
+## 獲取已安裝的包名字
+```bash
+mkdir /mnt/backup
+pacman -Qe > /mnt/backup/packagelist.txt
+```
+## 備份目錄
+```bash
+mkdir /mnt/backup/file
+#將整個/home目錄複製到file下，包含home目錄自身
+#如果是/home/的形式，則只複製home目錄下的內容，不包含home自身
+sudo rsync -avrh --progress /home /mnt/backup/file/
+sudo rsync -avrh --progress /docker /mnt/backup/file/
+```
+
+
 # 安裝基本系統
 參照官方[Wiki](https://wiki.archlinux.org/title/Installation_guide)。
 
@@ -55,9 +81,39 @@ mkfs.fat -F 32 -n BOOT /dev/nvme0n1p1
 
 # 根分區。-n 32k指定node size，默認是16K。
 mkfs.btrfs -L ROOT -n 32k /dev/nvme0n1p2
+```
 
-# 掛載根分區到/mnt時，增加使用透明壓縮項
-mount -o compress=zstd /dev/nvme0n1p2 /mnt
+### 創建btrfs子卷
+因為要用`Timeshift`来管理快照，所以只能用Ubuntu类型的子卷布局。根目录挂载在`@`子卷上，/home 目录挂载在`@home`子卷上；另外我还打算使用`grub-btrfs`来为快照自动创建`grub`目录，要求`/var/log`挂载在单独的子卷上；还有`@pkg`子卷挂载在`/var/cache/pacman/pkg`目录下，这个目录下保存的是下载的软件包缓存，也没什么保存快照的必要，所以也单独划分了个子卷。
+```sh
+# 挂载分区
+mount /dev/nvme0n1p2 /mnt
+# 创建子卷
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@pkg
+# 卸载分区
+umount /dev/nvme0n1p2
+```
+
+### 掛載分區
+```sh
+# 挂载根目录
+mount /dev/nvme0n1p2 /mnt -o subvol=@,noatime,discard=async,compress=zstd
+# 挂载家目录
+mkdir /mnt/home
+mount /dev/nvme0n1p2 /mnt/home -o subvol=@home,noatime,discard=async,compress=zstd
+# 挂载 /var/log 目录
+mkdir -p /mnt/var/log
+mount /dev/nvme0n1p2 /mnt/var/log -o subvol=@log,noatime,discard=async,compress=zstd
+# 挂载 /var/cache/pacman/pkg 目录
+mkdir -p /mnt/var/cache/pacman/pkg
+mount /dev/nvme0n1p2 /mnt/var/cache/pacman/pkg -o subvol=@pkg,noatime,discard=async,compress=zstd
+
+# 禁用以下目錄的CoW
+chattr +C /mnt/var/log
+chattr +C /mnt/var/cache/pacman/pkg
 
 # 掛載esp分區，我喜歡掛載爲/boot
 mkdir /mnt/boot
@@ -66,8 +122,17 @@ mount /dev/nvme0n1p1 /mnt/boot
 
 ## 安裝系統
 ```sh
-pacstrap /mnt base linux-lts linux-firmware btrfs-progs grub efibootmgr sudo vim nano
+pacstrap /mnt base linux linux-headers linux-firmware btrfs-progs grub efibootmgr sudo neovim amd-ucode
 ```
+
+## 修改配置文件
+### /etc/mkinitcpio.conf
+```
+MODULES=(btrfs vfio_pci vfio vfio_iommu_type1 kvm_amd)
+```
+
+最後別忘記執行`mkinitcpio -P`
+
 
 ## 安裝GRUB
 ```sh
@@ -94,32 +159,41 @@ passwd kaysiness
 ### 讓普通用戶使用sudo
 * https://wiki.archlinux.org/title/Sudo
 ```sh
-env EDITOR=/usr/bin/vim visudo
+env EDITOR=/usr/bin/nvim visudo
 ```
 ```apache
 # Reset environment by default
 Defaults      env_reset
 # Set default EDITOR to restricted version of nano, and do not allow visudo to use EDITOR/VISUAL.
-Defaults      editor=/usr/bin/vim, !env_editor
+Defaults      editor=/usr/bin/nvim, !env_editor
 
-kaysiness     ALL=(ALL:ALL) ALL
+%wheel        ALL=(ALL:ALL) ALL
 kaysiness     ALL=NOPASSWD: /usr/bin/pacman,/usr/bin/yay
 ```
 
 ### 啓用NTP矯時
 ```sh
-timedatactl set-ntp true
+timedatectl set-ntp true
 ```
 
 ### 更換源
 ```sh
 vim /etc/pacman.d/mirrorlist
+Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
+Server = https://mirrors.sjtug.sjtu.edu.cn/archlinux/$repo/os/$arch
+Server = https://mirrors.cloud.tencent.com/archlinux/$repo/os/$arch
+Server = https://mirrors.163.com/archlinux/$repo/os/$arch
 
 vim /etc/pacman.conf
 # 把Color前的註釋去掉，讓Pacman可以彩色輸出
+# 把VerbosePkgLists註釋去掉，讓Pacman輸出詳細信息
 [archlinuxcn]
+Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch
+Server = https://mirrors.sjtug.sjtu.edu.cn/archlinux-cn/$arch
+Server = https://mirrors.cloud.tencent.com/archlinuxcn/$arch
+Server = https://mirrors.163.com/archlinux-cn/$arch
 
 pacman -Syy archlinuxcn-keyring yay
 ```
@@ -127,6 +201,46 @@ pacman -Syy archlinuxcn-keyring yay
 ※ `yay`位於`archlinuxcn`源裏，不启用的話就只能通過[AUR](https://aur.archlinux.org/packages/yay)安裝了。
 
 然後就能重啓進入Archlinux了。
+
+## 還原舊系統的備份
+第一次進入系統前，先使用`root`帳號登入，等還原備份後再切換到自己的帳號
+```sh
+rsync -avrh --progress /mnt/backup/file/home/ /home/
+```
+
+# Btrfs快照
+```sh
+# timeshift-autosnap包是用於每次系統更新前自動創建快照
+yay -S timeshift timeshift-autosnap
+
+# Timeshift需要用到corn服務
+sudo systemctl enable --now cronie.service
+```
+
+## 安裝grub-btrfs
+`grub-btrfs`包是生成GRUB配置時自動添加快照入口，方便直接啟動系統到快照，不需要事先恢復快照。`inotify-tools`包是`grub-btrfs`的可選依賴，但為了自動生成GRUB配置需要安裝。
+```sh
+yay -S grub-btrfs inotify-tools
+
+# 啟動服務自動生成GRUB配置
+sudo systemctl enable --now grub-btrfsd.service
+```
+
+这个服务默认监视的快照路径在`/.snapshots`，而`Timeshift`创建的快照是一个动态变化的路径，想要让它监视`Timeshift`的快照路径需要编辑 service 文件。
+```sh
+sudo systemctl edit grub-btrfsd.service
+```
+```systemd
+[Service]
+ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto
+```
+这样`grub-btrfs`就会监视`Timeshift`创建的快照了。
+
+
+默認下`Timeshift`创建的快照默认是可读写的，但若用其他的快照管理程序，创建的快照可能是只读的，这种情况下，直接启动进入快照可能会发生错误，这种情况`grub-btrfs`也提供了解决方案，编辑`/etc/mkinitcpio.conf`，在`HOOKS`後面加入`grub-btrfs-overlayfs`。
+```
+HOOKS=(base udev autodetect modconf block filesystems keyboard fsck grub-btrfs-overlayfs)
+```
 
 
 # 安裝桌面環境
@@ -251,9 +365,12 @@ systemctl start --user firefox@kaysiness.main
 
 # [Zsh](https://wiki.archlinux.org/title/Zsh)
 ```sh
-yay -S zsh zsh-completions grml-zsh-config
+yay -S zsh zsh-completions grml-zsh-config zsh-theme-powerlevel10k
+
+# 可能还需要安装
+yay -S powerline-fonts powerline-common
 ```
-直接抄安裝嚮導的[.zshrc](zsh/zshrc)，方便快捷🙃
+~~直接抄安裝嚮導的[.zshrc](zsh/zshrc)，方便快捷🙃~~
 
 
 # Docker
@@ -353,6 +470,8 @@ services:
       - 'VIRTUAL_PATH=/'
     expose:
       - 8096
+    ports:
+      - '8096:8096'
 ```
 
 ※ 还需要在DNS服务器或者/etc/hosts上把容器的域名`jellyfin.example.com`绑定到`10.0.0.10`上。
@@ -520,10 +639,10 @@ flatpak install flathub com.valvesoftware.Steam
 # 讓Steam能訪問到其他位置上的遊戲庫
 flatpak override com.valvesoftware.Steam --filesystem=/path/to/directory
 
-# HiDPI縮放
-flatpak override com.valvesoftware.Steam --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 --env=GDK_SCALE=2
+# HiDPI縮放(150%)
+flatpak override com.valvesoftware.Steam --env=STEAM_FORCE_DESKTOPUI_SCALING=1.5
 
-# 代理(但應該是不起作用的)
+# 代理
 flatpak override com.valvesoftware.Steam --env=HTTP_PROXY=http://127.0.0.1:8080 --env=HTTPS_PROXY=http://127.0.0.1:8080
 ```
 
@@ -573,7 +692,7 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 
 提前加载`vfio-pci`內核模塊。編輯`/etc/mkinitcpio.conf`
 ```sh
-MODULES=(vfio_pci vfio vfio_iommu_type1 vfio_virqfd)
+MODULES=(vfio_pci vfio vfio_iommu_type1 ...)
 ```
 
 重新生成mkinitcpio
@@ -623,7 +742,7 @@ sudo systemctl enable --now libvirtd.service
 注意事項：
 * 芯片組選`Q35`，固件選`UEFI x86_64: /usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.fd`
 * CPU類型選`host-passthrough`
-* 其他保持默認，先把系統安裝好後在添加直通顯卡進去
+* 其他保持默認，先把系統安裝好後再添加直通顯卡進去
 
 安裝完成後關閉虛擬機
 
@@ -633,7 +752,7 @@ sudo systemctl enable --now libvirtd.service
 ```xml
 <features>
   <hyperv mode="custom">
-    <vendor_id state="on" value="4cc49aed5d33"/>
+    <vendor_id state="on" value="4aecc49d5d33"/>
     ......
   </hyperv>
   <kvm>
@@ -643,7 +762,7 @@ sudo systemctl enable --now libvirtd.service
 </features>
 ```
 
-在`virt-manager`裡把舊的虛擬硬解刪除，並把GTX 960和鼠標鍵盤加上去。
+在`virt-manager`裡把舊的虛擬顯卡刪除，並把GTX 960和evdev鼠標鍵盤加上去。
 
 我是喜歡Host OS和Guest OS共用一套鼠標鍵盤，好處是不用額外把一組USB控制器分給虛擬機，只需要同時按住左右兩個Ctrl鍵即可在兩套OS之間切換。
 
@@ -661,7 +780,7 @@ lrwxrwxrwx  9 root 07-06 11:05 └── usb-USB_Keyboard_USB_Keyboard_C104A0000
 ```
 正確的路徑是帶有event值這些，我這裡是`event9`和`event6`
 
-然後增加以下的內容。PS2管線的那一套虛擬鼠標鍵盤是不能刪除的，保留即可
+然後增加以下的內容。PS/2管線的那一套虛擬鼠標鍵盤是不能刪除的，保留即可
 ```xml
 <devices>
   ......
