@@ -317,8 +317,8 @@ LC_ALL=C xdg-user-dirs-update --force   # 使用英文名字創建
 
 ## 環境變量
 KDE圖形環境自身使用的環境變量存放在`~/.config/plasma-workspace/env/`下。
-* [hidpi.sh](environment/hidpi.sh)
-* [firefox.sh](environment/firefox.sh)
+* [60-hidpi.sh](environment/60-hidpi.sh)
+* [61-firefox.sh](environment/61-firefox.sh)
 
 ※ 可以使用`systemctl --user show-environment`來檢查是否生效。
 
