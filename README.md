@@ -773,6 +773,13 @@ sudo systemctl enable --now libvirtd.service
 </features>
 ```
 
+AMD Ryzen CPU 还需要额外修改
+```xml
+<cpu mode="host-passthrough" check="none" migratable="on">
+  <feature policy="require" name="topoext"/>
+</cpu>
+```
+
 在`virt-manager`裡把舊的虛擬顯卡刪除，並把GTX 960和evdev鼠標鍵盤加上去。
 
 我是喜歡Host OS和Guest OS共用一套鼠標鍵盤，好處是不用額外把一組USB控制器分給虛擬機，只需要同時按住左右兩個Ctrl鍵即可在兩套OS之間切換。
