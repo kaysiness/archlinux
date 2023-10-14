@@ -14,15 +14,18 @@
     - [讓普通用戶使用sudo](#讓普通用戶使用sudo)
     - [啓用NTP矯時](#啓用ntp矯時)
     - [更換源](#更換源)
+    - [安装NetworkManager](#安装networkmanager)
+    - [提前修改系统环境变量](#提前修改系统环境变量)
   - [還原舊系統的備份](#還原舊系統的備份)
+- [配置网络](#配置网络)
 - [Btrfs快照](#btrfs快照)
   - [安裝grub-btrfs](#安裝grub-btrfs)
 - [安裝桌面環境](#安裝桌面環境)
-  - [安裝Xorg和顯卡驅動](#安裝xorg和顯卡驅動)
+  - [安裝Wayland和顯卡驅動](#安裝wayland和顯卡驅動)
   - [PipeWire](#pipewire)
-  - [NetworkManager](#networkmanager)
   - [字體](#字體)
   - [安裝KDE](#安裝kde)
+    - [安装额外的软件](#安装额外的软件)
   - [輸入法Fcitx](#輸入法fcitx)
 - [配置桌面環境](#配置桌面環境)
   - [創建家目錄下的默認目錄](#創建家目錄下的默認目錄)
@@ -122,7 +125,7 @@ mount /dev/nvme0n1p1 /mnt/boot
 
 ## 安裝系統
 ```sh
-pacstrap /mnt base linux linux-headers linux-firmware btrfs-progs grub efibootmgr sudo neovim amd-ucode
+pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs grub efibootmgr sudo neovim amd-ucode
 ```
 
 ## 修改配置文件
@@ -200,12 +203,60 @@ pacman -Syy archlinuxcn-keyring yay
 
 ※ `yay`位於`archlinuxcn`源裏，不启用的話就只能通過[AUR](https://aur.archlinux.org/packages/yay)安裝了。
 
+### 安装NetworkManager
+```sh
+yay -S networkmanager
+sudo systemctl enable NetworkManager.service
+```
+
+### 提前修改系统环境变量
+```ini
+# vi /etc/environment
+
+# EDITOR
+EDITOR=/usr/bin/nvim
+
+# Fcitx5
+GTK_IM_MODULE=fcitx
+QT_IM_MODULE=fcitx
+XMODIFIERS=@im=fcitx
+INPUT_METHOD=fcitx
+SDL_IM_METHOD=fcitx
+GLFW_IM_METHOD=ibus
+
+# Wayland
+QT_QPA_PLATFORM="wayland;xcb"
+```
+
 然後就能重啓進入Archlinux了。
+
 
 ## 還原舊系統的備份
 第一次進入系統前，先使用`root`帳號登入，等還原備份後再切換到自己的帳號
 ```sh
 rsync -avrh --progress /mnt/backup/file/home/ /home/
+```
+
+# 配置网络
+※ 偷懒可以先使用`systemd-networkd.server`顶上一下，等装完桌面后再用`NetworkdManager`修改
+```systemd
+# vi /etc/system/network/20-enp1s0.network
+[Match]
+name=enp1s0
+
+[Networkd]
+DHCP=ipv4
+```
+```sh
+sudo systemctl daemon-reload
+sudo systemctl stop NetworkManager.service
+sudo systemctl start systemd-networkd.service systemd-resolved.service
+```
+
+又或者使用`nmcli`命令
+```sh
+nmcli connection modify enp1s0 ipv4.method auto
+nmcli connection reload
 ```
 
 # Btrfs快照
@@ -242,35 +293,26 @@ ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto
 HOOKS=(base udev autodetect modconf block filesystems keyboard fsck grub-btrfs-overlayfs)
 ```
 
-
 # 安裝桌面環境
 
 此處用的是`AMD Ryzen5 3400G`自帶的核顯
 
-## 安裝Xorg和顯卡驅動
+## 安裝Wayland和顯卡驅動
 參考
 * https://wiki.archlinux.org/title/Xorg
 * https://wiki.archlinux.org/title/AMDGPU
 ```sh
-yay -S xorg-server xf86-video-amdgpu \
-       mesa-vdpau \
-       vulkan-radeon
+yay -S wayland libinput mesa-vdpau vulkan-radeon
+#yay -S xorg-server xf86-video-amdgpu mesa-vdpau vulkan-radeon # X11
 ```
 
 ## PipeWire
 ```sh
 yay -S pipewire pipewire-alsa pipewire-pulse
+
+# 一般安装完会自动启用不需要这两步
 sudo systemctl enable pipewire-pulse.socket
 systemctl --user enable pipewire-pulse.service
-```
-
-## NetworkManager
-```sh
-yay -S networkmanager
-sudo systemctl enable NetworkManager.service
-
-# 如果有用其他網絡管理，需要禁用掉
-sudo systemctl disable systemd-networkd.service systemd-resolved.service
 ```
 
 ## 字體
@@ -278,7 +320,8 @@ sudo systemctl disable systemd-networkd.service systemd-resolved.service
 yay -S ttf-dejavu \
        noto-fonts-cjk noto-fonts-emoji noto-fonts \
        wqy-microhei \
-       ttf-sarasa-gothic
+       ttf-sarasa-gothic \
+       ttf-lxgw-wenkai ttf-lxgw-wenkai-mono
 ```
 
 ## 安裝KDE
@@ -290,8 +333,10 @@ yay -S ttf-dejavu \
 * `plasma-pa`和`plasma-nm`用於PulseAudio和NetworkManager的組件
 * `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
 ```sh
-yay -S plasma-meta kde-applications-meta \
-       plasma-pa plasma-nm \
+# 不嫌弃安装一大堆没有的包，可以直接安装 plasma-meta 和 kde-applications-meta 两个包，这样整个KDE Plasms都装上了
+yay -S plasma-desktop plasma-pa plasma-nm \
+       qt5-wayland qt6-wayland plasma-wayland-session \
+       kscreen konsole kate \
        sddm sddm-kcm \
        kde-gtk-config breeze-gtk \
        powerdevil
@@ -299,11 +344,20 @@ yay -S plasma-meta kde-applications-meta \
 sudo systemctl enable sddm.service
 ```
 
+### 安装额外的软件
+```sh
+yay -S eza duf p7zip
+
+# yay -S kde-applications
+yay -S dolphin dolphin-plugins kclac krdc yakuake kclock kdeconnect kdenetwork-filesharing
+yay -S gwenview krita ffmpegthumbs okular ark
+```
+
 ## 輸入法Fcitx
 * https://wiki.archlinux.org/title/Fcitx5_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)
 * [Rime設定](https://github.com/wongdean/rime-settings)
 ```sh
-yay -S fcitx5-im fcitx5-rime fcitx5-mozc
+yay -S fcitx5-im fcitx5-rime fcitx5-mozc rime-ice-git
 ```
 ※ System Settings > Regional Settings > Input Method > Configure addons > 「經典用戶界面」旁邊的設置圖標 > 修改「字體」/「垂直候選列表」等，可以改變打字時選字的界面。
 
@@ -370,7 +424,11 @@ yay -S zsh zsh-completions grml-zsh-config zsh-theme-powerlevel10k
 # 可能还需要安装
 yay -S powerline-fonts powerline-common
 ```
-~~直接抄安裝嚮導的[.zshrc](zsh/zshrc)，方便快捷🙃~~
+~~直接抄安裝嚮導的[.zshrc](zsh/zshrc)，方便快捷🙃~~  
+把`.zshrc`和`.p10k.zsh`复制到HOME目录下，运行一下`zsh`命令，没问题就可以切换到zsh了
+```sh
+chsh -s /bin/zsh
+```
 
 
 # Docker
@@ -556,7 +614,7 @@ sudo docker-compose up
 # [Flatpak](https://wiki.archlinux.org/title/Flatpak)
 ※ 一般情況下，本章節所有的`flatpak`命令都是以普通權限用戶運行，相當於`flatpak --user <command>`。
 ```sh
-yay -S flatpak
+yay -S flatpak flatpak-kcm
 sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
