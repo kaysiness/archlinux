@@ -1,0 +1,44 @@
+name: nginx-proxy
+services:
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - /docker/nginx-proxy/certs:/etc/nginx/certs:ro
+    environment:
+      HTTP_PORT: 80
+      HTTPS_PORT: 443
+      ENABLE_IPV6: true
+      DISABLE_ACCESS_LOGS: true
+    networks:
+      home-lan:
+        priority: 101   # 網絡優先級
+        ipv4_address: 10.0.101.163    # 指定容器IPv4地址
+        ipv6_address: fc00::101:163   # 指定容器IPv6地址
+      home-br:
+        priority: 0
+        ipv4_address: 10.10.101.163
+        ipv6_address: fc00:10::101:163
+
+  acme.sh:
+    image: neilpang/acme.sh:latest
+    container_name: acme.sh
+    command: daemon
+    restart: unless-stopped
+    volumes:
+      - acmesh-data:/acme.sh
+      - /docker/nginx-proxy/certs:/certs  # 域名SSL證書的crt和key文件存放的位置
+    environment:
+      - CF_Token=<你的token值>
+    network_name: home-br
+
+networks:
+  home-lan:
+    external: true
+  home-br:
+    external: true
+
+volumes:
+  acmesh-data:

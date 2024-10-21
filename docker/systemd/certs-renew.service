@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew certificates
+
+[Service]
+WorkingDirectory=/docker/nginx-proxy/certs
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/usr/local/bin/certs-renew.sh
+
+[Install]
+WantedBy=multi-user.target

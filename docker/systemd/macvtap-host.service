@@ -1,0 +1,12 @@
+[Unit]
+Description=Create macvtap-host network device
+After=network.target NetworkManager-wait-online.service docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/macvtap.sh -m add
+ExecStop=/usr/local/bin/macvtap.sh -m del
+
+[Install]
+WantedBy=multi-user.target

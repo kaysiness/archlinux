@@ -1,0 +1,8 @@
+[Unit]
+Description=Monitor acme.sh certs for changes
+
+[Path]
+PathChanged=/docker/nginx-proxy/certs
+
+[Install]
+WantedBy=multi-user.target

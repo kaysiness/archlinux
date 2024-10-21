@@ -94,87 +94,11 @@ networks:
 其原理是，因爲macvtap網卡之間是可以正常通訊的，那麼只要給宿主機添加一個macvtap網卡即可訪問到容器
 
 ### 創建自動添加macvtap網卡的bash腳本
-別忘記給腳本添加執行權限和enable timer
-<details>
-<summary>/usr/local/bin/macvtap.sh</summary>
-```bash
-#!/usr/bin/env bash
+※ 別忘記給腳本添加執行權限和enable timer
 
-declare -r PATH=/usr/sbin:/usr/bin:/sbin:/bin
-
-while getopts 'm:' OPTS; do
-  case "$OPTS" in
-    m)
-      model="$OPTARG"
-      ;;
-    *)
-      echo usage: $0 -m "<add|del>"
-      exit 0
-      ;;
-  esac
-done
-shift "$(($OPTIND - 1))"
-
-# 檢查參數是否正確
-if [ -z "$model" ]; then
-  echo "usage: $0 -m <add|del>"
-  exit 1
-fi
-
-netMactap="tap1s0"
-netDevice="enp1s0"
-
-# 創建/刪除macvtap網卡
-case "$model" in
-  add)
-    ip link add link ${netDevice} name ${netMactap} type macvtap mode bridge
-    ip link set ${netMactap} up
-    ip route add 10.0.101.0/24 dev ${netMactap} metric 90
-    ;;
-  del)
-    ip route del 10.0.101.0/24 dev ${netMactap}
-    ip link set ${netMactap} down
-    ip link delete ${netMactap}
-    ;;
-  *)
-    echo usage: $0 -m "<add|del>"
-    exit 1
-    ;;
-esac
-```
-</details>
-
-<details>
-<summary>/etc/systemd/system/macvtap-host.service</summary>
-```ini
-[Unit]
-Description=Create macvtap-host network device
-After=network.target NetworkManager-wait-online.service docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/macvtap.sh -m add
-ExecStop=/usr/local/bin/macvtap.sh -m del
-
-[Install]
-WantedBy=multi-user.target
-```
-</details>
-
-<details>
-<summary>/etc/systemd/system/macvtap-host.timer</summary>
-```ini
-[Unit]
-Description=Start macvtap-host.service after one minute of startup.
-
-[Timer]
-OnBootSec=1min
-
-[Install]
-WantedBy=multi-user.target
-```
-</details>
+* [/etc/systemd/system/macvtap-host.service](/docker/systemd/macvtap-host.service)
+* [/etc/systemd/system/macvtap-host.timer](/docker/systemd/macvtap-host.timer)
+* [/usr/local/bin/macvtap.sh](/docker/bin/macvtap.sh)
 
 
 ## 使用nginx-proxy自動給容器服務做反代
@@ -187,54 +111,7 @@ WantedBy=multi-user.target
 3. 最好有一個本地DNS，把`*.docker.kkun.date`解析到`nginx-proxy`容器的IP地址
 
 ### 啓動`acme.sh`和`nginx-proxy`容器
-<details>
-<summary>docker-compose.yml</summary>
-```yaml
-services:
-  nginx-proxy:
-    image: nginxproxy/nginx-proxy:alpine
-    container_name: nginx-proxy
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      - /docker/nginx-proxy/certs:/etc/nginx/certs:ro
-    environment:
-      HTTP_PORT: 80
-      HTTPS_PORT: 443
-      ENABLE_IPV6: true
-      DISABLE_ACCESS_LOGS: true
-    networks:
-      home-lan:
-        priority: 101   # 網絡優先級
-        ipv4_address: 10.0.101.163    # 指定容器IPv4地址
-        ipv6_address: fc00::101:163   # 指定容器IPv6地址
-      home-br:
-        priority: 0
-        ipv4_address: 10.10.101.163
-        ipv6_address: fc00:10::101:163
-
-  acme.sh:
-    image: neilpang/acme.sh:latest
-    container_name: acme.sh
-    command: daemon
-    restart: unless-stopped
-    volumes:
-      - acmesh-data:/acme.sh
-      - /docker/nginx-proxy/certs:/certs  # 域名SSL證書的crt和key文件存放的位置
-    environment:
-      - CF_Token=<你的token值>
-    network_name: home-br
-
-networks:
-  home-lan:
-    external: true
-  home-br:
-    external: true
-
-volumes:
-  acmesh-data:
-```
-</details>
+* [docker-compose.yml](/docker/docker-compose/nginx-proxy.yml)
 
 ### 申請SSL證書
 ```bash
@@ -255,57 +132,9 @@ sudo docker exec acme.sh --revoke --ecc -d "*.docker.kkun.date"
 ```
 
 ### 監控證書變化並自動重啓nginx-proxy容器
-<details>
-<summary>/usr/local/bin/certs-renew.sh</summary>
-```bash
-#!/usr/bin/env bash
-
-declare -r PATH=/usr/bin:/bin
-declare -r certName="docker.kkun.date"   # 如有多個域名，通過空格分開寫入下面的變量
-declare -r workDir=/docker/nginx-proxy/certs
-
-for name in ${certName}; do
-  crtName=${name}.crt
-  keyName=${name}.key
-
-  chmod 400 ${workDir}/${keyName}
-  chmod 444 ${workDir}/${crtName}
-done
-
-docker restart nginx-proxy
-```
-</details>
-
-<details>
-<summary>/etc/systemd/system/certs-renew.service</summary>
-```ini
-[Unit]
-Description=Renew certificates
-
-[Service]
-WorkingDirectory=/docker/nginx-proxy/certs
-Type=oneshot
-RemainAfterExit=no
-ExecStart=/usr/local/bin/certs-renew.sh
-
-[Install]
-WantedBy=multi-user.target
-```
-</details>
-
-<details>
-<summary>/etc/systemd/system/certs-renew.path</summary>
-```ini
-[Unit]
-Description=Monitor acme.sh certs for changes
-
-[Path]
-PathChanged=/docker/nginx-proxy/certs
-
-[Install]
-WantedBy=multi-user.target
-```
-</details>
+* [/usr/local/bin/certs-renew.sh](/docker/bin/certs-renew.sh)
+* [/etc/systemd/system/certs-renew.service](/docker/systemd/certs-renew.service)
+* [/etc/systemd/system/certs-renew.path](/docker/systemd/certs-renew.path)
 
 
 ### 給容器綁定域名

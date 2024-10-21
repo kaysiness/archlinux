@@ -1,0 +1,8 @@
+[Unit]
+Description=Start macvtap-host.service after one minute of startup.
+
+[Timer]
+OnBootSec=1min
+
+[Install]
+WantedBy=multi-user.target
