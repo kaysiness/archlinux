@@ -1,0 +1,50 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    user: 1000:1000
+    restart: unless-stopped
+    devices:
+      # VAAPI Devices
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/dri/card1:/dev/dri/card1
+    group_add:
+      # VAAPI 还需要把render组添加到docker权限，该组ID可以在/etc/group查看
+      - 989
+    environment:
+      HTTP_PROXT: http://proxy.lan:8080
+      HTTPS_PROXT: http://proxy.lan:8080
+      NO_PROXT: localhost,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1,fc00::/64
+      HEALTHCHECK_URL: http://localhost/health
+      TZ: Asia/Shanghai
+      VIRTUAL_HOST: jellyfin.s.kkun.date,jellyfin.n.kkun.date
+      VIRTUAL_PORT: 80
+      #VIRTUAL_PATH: /jellyfin/
+      #VIRTUAL_DEST: /jellyfin/
+    volumes:
+      - config:/config
+      - cache:/cache
+      - /home/kaysiness/.local/share/fonts:/config/fonts:ro
+      - /usr/share/fonts:/usr/share/fonts:ro
+      - /media/bangumi:/media/bangumi:ro
+      - /media/video:/media/video:ro
+      - /media/music:/media/music:ro
+      - /media/download:/media/download
+    tmpfs:
+      - /config/transcodes:rw,mode=755,uid=1000,gid=1000,noexec,nosuid,size=8g
+    expose:
+      - 80
+    networks:
+      home-lan:
+        ipv4_address: 10.0.101.162
+        ipv6_address: fc00::101:162
+    extra_hosts:
+      - proxy.lan:10.0.0.100
+
+networks:
+  home-lan:
+    external: true
+
+volumes:
+  config:
+  cache:

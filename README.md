@@ -11,13 +11,13 @@
   - [安裝GRUB](#安裝grub)
   - [重啓前的準備](#重啓前的準備)
     - [新建普通用戶](#新建普通用戶)
-    - [讓普通用戶使用sudo](#讓普通用戶使用sudo)
-    - [啓用NTP矯時](#啓用ntp矯時)
-    - [更換源](#更換源)
+    - [sudo](#sudo)
+    - [啓用NTP](#啓用ntp)
+    - [添加archlinuxcn源](#添加archlinuxcn源)
     - [安装NetworkManager](#安装networkmanager)
-    - [提前修改系统环境变量](#提前修改系统环境变量)
+    - [提前修改系統環境變量](#提前修改系統環境變量)
   - [還原舊系統的備份](#還原舊系統的備份)
-- [配置网络](#配置网络)
+- [配置網絡](#配置網絡)
 - [Btrfs快照](#btrfs快照)
   - [安裝grub-btrfs](#安裝grub-btrfs)
 - [安裝桌面環境](#安裝桌面環境)
@@ -29,42 +29,27 @@
   - [輸入法Fcitx](#輸入法fcitx)
 - [配置桌面環境](#配置桌面環境)
   - [創建家目錄下的默認目錄](#創建家目錄下的默認目錄)
-  - [環境變量](#環境變量)
-  - [HiDPI](#hidpi)
   - [Firefox相關](#firefox相關)
     - [使用systemd啓動Firefox](#使用systemd啓動firefox)
-- [Zsh](#zsh)
-- [Docker](#docker)
-  - [创建给容器用的Macvlan网络](#创建给容器用的macvlan网络)
-  - [使用nginx-proxy给容器服务做反代](#使用nginx-proxy给容器服务做反代)
-  - [OneDrive](#onedrive)
-  - [Jellyfin](#jellyfin)
 - [Flatpak](#flatpak)
   - [解決字體問題](#解決字體問題)
   - [其他各種會用到的軟件](#其他各種會用到的軟件)
     - [XnViewMP](#xnviewmp)
     - [Jellyfin Media Player](#jellyfin-media-player)
 - [常用軟件](#常用軟件)
-- [遊戲相關](#遊戲相關)
-  - [Steam](#steam)
-  - [顯卡直通給Windows Guest虛擬機](#顯卡直通給windows-guest虛擬機)
-    - [前期準備](#前期準備)
-      - [找出並記下IOMMU分組](#找出並記下iommu分組)
-    - [隔離GPU](#隔離gpu)
-    - [安裝必要軟體](#安裝必要軟體)
-    - [安裝Windows 10](#安裝windows-10)
-    - [修改Windows 10的虛擬設定](#修改windows-10的虛擬設定)
 
 ---
 
+記錄自己安裝Archlinux的過程。
+
 # 備份舊系統
 ## 獲取已安裝的包名字
-```bash
+```sh
 mkdir /mnt/backup
 pacman -Qe > /mnt/backup/packagelist.txt
 ```
 ## 備份目錄
-```bash
+```sh
 mkdir /mnt/backup/file
 #將整個/home目錄複製到file下，包含home目錄自身
 #如果是/home/的形式，則只複製home目錄下的內容，不包含home自身
@@ -87,32 +72,32 @@ mkfs.btrfs -L ROOT -n 32k /dev/nvme0n1p2
 ```
 
 ### 創建btrfs子卷
-因為要用`Timeshift`来管理快照，所以只能用Ubuntu类型的子卷布局。根目录挂载在`@`子卷上，/home 目录挂载在`@home`子卷上；另外我还打算使用`grub-btrfs`来为快照自动创建`grub`目录，要求`/var/log`挂载在单独的子卷上；还有`@pkg`子卷挂载在`/var/cache/pacman/pkg`目录下，这个目录下保存的是下载的软件包缓存，也没什么保存快照的必要，所以也单独划分了个子卷。
+因為要用`Timeshift`來管理快照，所以只能用Ubuntu類型的子卷佈局。
 ```sh
-# 挂载分区
+# 掛載分區
 mount /dev/nvme0n1p2 /mnt
-# 创建子卷
+# 創建子卷
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
 btrfs subvolume create /mnt/@log
 btrfs subvolume create /mnt/@pkg
-# 卸载分区
+# 卸載分區
 umount /dev/nvme0n1p2
 ```
 
 ### 掛載分區
 ```sh
-# 挂载根目录
-mount /dev/nvme0n1p2 /mnt -o subvol=@,noatime,discard=async,compress=zstd
-# 挂载家目录
+# 掛載根目錄
+mount /dev/nvme0n1p2 /mnt -o subvol=@,rw,relatime,compress=zstd:3,discard=async,ssd,space_cache=v2,subvolid=5
+# 掛載 /home 目錄
 mkdir /mnt/home
-mount /dev/nvme0n1p2 /mnt/home -o subvol=@home,noatime,discard=async,compress=zstd
-# 挂载 /var/log 目录
+mount /dev/nvme0n1p2 /mnt/home -o subvol=@home,relatime,compress=zstd:3,discard=async,ssd,space_cache=v2,subvolid=5
+# 掛載 /var/log 目錄
 mkdir -p /mnt/var/log
-mount /dev/nvme0n1p2 /mnt/var/log -o subvol=@log,noatime,discard=async,compress=zstd
-# 挂载 /var/cache/pacman/pkg 目录
+mount /dev/nvme0n1p2 /mnt/var/log -o subvol=@log,relatime,compress=zstd:3,discard=async,ssd,space_cache=v2,subvolid=5
+# 掛載 /var/cache/pacman/pkg 目錄
 mkdir -p /mnt/var/cache/pacman/pkg
-mount /dev/nvme0n1p2 /mnt/var/cache/pacman/pkg -o subvol=@pkg,noatime,discard=async,compress=zstd
+mount /dev/nvme0n1p2 /mnt/var/cache/pacman/pkg -o subvol=@pkg,relatime,compress=zstd:3,discard=async,ssd,space_cache=v2,subvolid=5
 
 # 禁用以下目錄的CoW
 chattr +C /mnt/var/log
@@ -125,13 +110,14 @@ mount /dev/nvme0n1p1 /mnt/boot
 
 ## 安裝系統
 ```sh
-pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs grub efibootmgr sudo neovim amd-ucode
+pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs grub efibootmgr sudo neovim bash-completion amd-ucode
 ```
 
 ## 修改配置文件
+※ 以下這步是給之後的虛擬機顯卡直通做準備
 ### /etc/mkinitcpio.conf
 ```
-MODULES=(btrfs vfio_pci vfio vfio_iommu_type1 kvm_amd)
+MODULES=(vfio_pci vfio vfio_iommu_type1 kvm_amd)
 ```
 
 最後別忘記執行`mkinitcpio -P`
@@ -139,8 +125,8 @@ MODULES=(btrfs vfio_pci vfio vfio_iommu_type1 kvm_amd)
 
 ## 安裝GRUB
 ```sh
-vim /etc/default/grub
-# 等待時間
+nvim /etc/default/grub
+# 等待時間，設置爲-1即一直等待
 GRUB_TIMEOUT=0
 ```
 ※ 如需要發現其他硬盤上的Windows系統，可以參考這篇[Wiki](https://wiki.archlinux.org/title/GRUB#Windows_installed_in_UEFI/GPT_mode)。直接把生成的內容寫入`/etc/grub.d/40_custom`末尾。
@@ -159,49 +145,31 @@ useradd -m -G wheel -s /bin/bash kaysiness
 passwd kaysiness
 ```
 
-### 讓普通用戶使用sudo
-* https://wiki.archlinux.org/title/Sudo
+### sudo
 ```sh
-env EDITOR=/usr/bin/nvim visudo
+env EDITOR=/usr/bin/nvim visudo /etc/sudoers.d/kaysiness
 ```
-```apache
-# Reset environment by default
-Defaults      env_reset
-# Set default EDITOR to restricted version of nano, and do not allow visudo to use EDITOR/VISUAL.
-Defaults      editor=/usr/bin/nvim, !env_editor
-
+```
 %wheel        ALL=(ALL:ALL) ALL
 kaysiness     ALL=NOPASSWD: /usr/bin/pacman,/usr/bin/yay
 ```
 
-### 啓用NTP矯時
+### 啓用NTP
 ```sh
 timedatectl set-ntp true
 ```
 
-### 更換源
+### 添加archlinuxcn源
+※ 如需換源可以考慮使用 https://github.com/RubyMetric/chsrc
+
 ```sh
-vim /etc/pacman.d/mirrorlist
-Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.sjtug.sjtu.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.cloud.tencent.com/archlinux/$repo/os/$arch
-Server = https://mirrors.163.com/archlinux/$repo/os/$arch
-
-vim /etc/pacman.conf
-# 把Color前的註釋去掉，讓Pacman可以彩色輸出
-# 把VerbosePkgLists註釋去掉，讓Pacman輸出詳細信息
-[archlinuxcn]
-Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch
-Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch
-Server = https://mirrors.sjtug.sjtu.edu.cn/archlinux-cn/$arch
-Server = https://mirrors.cloud.tencent.com/archlinuxcn/$arch
-Server = https://mirrors.163.com/archlinux-cn/$arch
-
-pacman -Syy archlinuxcn-keyring yay
+curl -L https://github.com/RubyMetric/chsrc/releases/download/pre/chsrc-x64-linux -o /tmp/chsrc; chmod +x /tmp/chsrc
+/tmp/chsrc set archlinux
+/tmp/chsrc set archlinuxcn
+pacman -Syy archlinuxcn-keyring yay   # archlinuxcn-keyring 和 yay 不能同時安裝
 ```
 
-※ `yay`位於`archlinuxcn`源裏，不启用的話就只能通過[AUR](https://aur.archlinux.org/packages/yay)安裝了。
+※ `yay`位於`archlinuxcn`源，不启用的話就只能通過[AUR](https://aur.archlinux.org/packages/yay)安裝了。
 
 ### 安装NetworkManager
 ```sh
@@ -209,23 +177,17 @@ yay -S networkmanager
 sudo systemctl enable NetworkManager.service
 ```
 
-### 提前修改系统环境变量
+### 提前修改系統環境變量
 ```ini
 # vi /etc/environment
 
 # EDITOR
 EDITOR=/usr/bin/nvim
 
-# Fcitx5
-GTK_IM_MODULE=fcitx
-QT_IM_MODULE=fcitx
-XMODIFIERS=@im=fcitx
-INPUT_METHOD=fcitx
-SDL_IM_METHOD=fcitx
-GLFW_IM_METHOD=ibus
-
-# Wayland
-QT_QPA_PLATFORM="wayland;xcb"
+# Proxy
+HTTP_PROXY=
+HTTPS_PROXY=
+NO_PROXY=localhost,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1,fc00::,*.lan
 ```
 
 然後就能重啓進入Archlinux了。
@@ -237,25 +199,18 @@ QT_QPA_PLATFORM="wayland;xcb"
 rsync -avrh --progress /mnt/backup/file/home/ /home/
 ```
 
-# 配置网络
-※ 偷懒可以先使用`systemd-networkd.server`顶上一下，等装完桌面后再用`NetworkdManager`修改
-```systemd
-# vi /etc/system/network/20-enp1s0.network
-[Match]
-name=enp1s0
-
-[Networkd]
-DHCP=ipv4
-```
+# 配置網絡
 ```sh
-sudo systemctl daemon-reload
-sudo systemctl stop NetworkManager.service
-sudo systemctl start systemd-networkd.service systemd-resolved.service
-```
+# 新建一个HOME连接并使用物理网卡enp1s0
+nmcli connection add con-name HOME ifname enp1s0 type ethernet
 
-又或者使用`nmcli`命令
-```sh
-nmcli connection modify enp1s0 ipv4.method auto
+# HOME连接使用DHCP配置IPv4
+nmcli connection modify HOME ipv4.method auto
+
+# 或者手动指定HOME连接的IPv4地址
+nmcli connection modify HOME ipv4.addresses 10.0.0.10/16 ipv4.gateway 10.0.0.1 ipv4.dns 10.0.0.1
+
+# 重新加载配置
 nmcli connection reload
 ```
 
@@ -269,7 +224,7 @@ sudo systemctl enable --now cronie.service
 ```
 
 ## 安裝grub-btrfs
-`grub-btrfs`包是生成GRUB配置時自動添加快照入口，方便直接啟動系統到快照，不需要事先恢復快照。`inotify-tools`包是`grub-btrfs`的可選依賴，但為了自動生成GRUB配置需要安裝。
+`grub-btrfs`包是生成GRUB配置自動添加快照入口，方便直接啟動系統到快照，不需要事先恢復快照。`inotify-tools`包是`grub-btrfs`的可選依賴，但為了自動生成GRUB配置需要安裝。
 ```sh
 yay -S grub-btrfs inotify-tools
 
@@ -295,12 +250,13 @@ HOOKS=(base udev autodetect modconf block filesystems keyboard fsck grub-btrfs-o
 
 # 安裝桌面環境
 
-此處用的是`AMD Ryzen5 3400G`自帶的核顯
+此處用的是`AMD Ryzen5 5700G`自帶的核顯
 
 ## 安裝Wayland和顯卡驅動
 參考
 * https://wiki.archlinux.org/title/Xorg
 * https://wiki.archlinux.org/title/AMDGPU
+
 ```sh
 yay -S wayland libinput mesa-vdpau vulkan-radeon
 #yay -S xorg-server xf86-video-amdgpu mesa-vdpau vulkan-radeon # X11
@@ -319,7 +275,7 @@ systemctl --user enable pipewire-pulse.service
 ```sh
 yay -S ttf-dejavu \
        noto-fonts-cjk noto-fonts-emoji noto-fonts \
-       wqy-microhei \
+       wqy-microhei wey-zenhei \
        ttf-sarasa-gothic \
        ttf-lxgw-wenkai ttf-lxgw-wenkai-mono
 ```
@@ -331,9 +287,10 @@ yay -S ttf-dejavu \
 注意事項
 * `phonon`後端使用`GStreamer`
 * `plasma-pa`和`plasma-nm`用於PulseAudio和NetworkManager的組件
-* `powerdevil`電源管理。如果不用NetworkManager的話可以裝AUR裏的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
+* `powerdevil`電源管理，依賴與NetworkManager，如果不用的話可以裝AUR的[`powerdevil-light`](https://aur.archlinux.org/packages/powerdevil-light)
+* 不嫌棄安裝一大堆沒用的包，可以直接安裝`yay -S plasma-meta kde-applications-meta`這兩個包，這樣整個KDE Plasms都裝上了。我是直接裝了這兩個meta包的，**下面命令安裝的包只是用於記錄**。
+
 ```sh
-# 不嫌弃安装一大堆没有的包，可以直接安装 plasma-meta 和 kde-applications-meta 两个包，这样整个KDE Plasms都装上了
 yay -S plasma-desktop plasma-pa plasma-nm \
        qt5-wayland qt6-wayland plasma-wayland-session \
        kscreen konsole kate \
@@ -354,36 +311,23 @@ yay -S gwenview krita ffmpegthumbs okular ark
 ```
 
 ## 輸入法Fcitx
-* https://wiki.archlinux.org/title/Fcitx5_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)
+* https://wiki.archlinux.org/title/Fcitx5
 * [Rime設定](https://github.com/wongdean/rime-settings)
+
 ```sh
 yay -S fcitx5-im fcitx5-rime fcitx5-mozc rime-ice-git
 ```
+
 ※ System Settings > Regional Settings > Input Method > Configure addons > 「經典用戶界面」旁邊的設置圖標 > 修改「字體」/「垂直候選列表」等，可以改變打字時選字的界面。
 
 # 配置桌面環境
+※ **從舊系統恢復的話可以跳過此步驟**
 
 ## 創建家目錄下的默認目錄
 ```sh
 yay -S xdg-user-dirs
 LC_ALL=C xdg-user-dirs-update --force   # 使用英文名字創建
 ```
-
-## 環境變量
-KDE圖形環境自身使用的環境變量存放在`~/.config/plasma-workspace/env/`下。
-* [60-hidpi.sh](environment/60-hidpi.sh)
-* [61-firefox.sh](environment/61-firefox.sh)
-
-※ 可以使用`systemctl --user show-environment`來檢查是否生效。
-
-btw，臨時設置一個圖形環境可用的環境變量，可以用`systemctl --user set-environment <env>=<value>`
-
-## HiDPI
-* https://wiki.archlinux.org/title/HiDPI#KDE_Plasma
-
-把`Force fonts DPI`改成`144`。等效於Windows下的150%縮放。
-
-※ 更多的HiDPI設置在上一章節的環境變量中。
 
 ## Firefox相關
 ```sh
@@ -416,200 +360,6 @@ WantedBy=multi-user.target
 systemctl start --user firefox@kaysiness.main
 ```
 
-
-# [Zsh](https://wiki.archlinux.org/title/Zsh)
-```sh
-yay -S zsh zsh-completions grml-zsh-config zsh-theme-powerlevel10k
-
-# 可能还需要安装
-yay -S powerline-fonts powerline-common
-```
-~~直接抄安裝嚮導的[.zshrc](zsh/zshrc)，方便快捷🙃~~  
-把`.zshrc`和`.p10k.zsh`复制到HOME目录下，运行一下`zsh`命令，没问题就可以切换到zsh了
-```sh
-chsh -s /bin/zsh
-```
-
-
-# Docker
-```sh
-yay -S docker docker-compose
-sudo systemctl enable docker.service
-```
-※ 我個人比較喜歡把Docker的各種容器配置文件放在`/docker`下。
-```sh
-sudo mkdir /docker
-```
-
-## 创建给容器用的Macvlan网络
-```sh
-sudo docker network create -d macvlan --subnet=10.0.0.0/24 --gateway=10.0.0.2 --aux-address="router=10.0.0.1" -o parent=enp5s0 home
-
-# --subnet=10.0.0.0/24  使新建的Macvlan网段和真实局域网段相同
-# --gateway=10.0.0.2    网关
-# --aux-address=""      让DHCP不分配的IP地址，可以设置多个--aux-address=""，但我的建议是加入这个home网络的容器全部分配静态IP地址。
-```
-
-※ 加入home网络的容器手动指定IP地址
-```yml
-version: "3.6"
-services:
-  service_name:
-    environment:
-      - 'ServerIP=10.0.0.50'
-    networks:
-      home:
-        ipv4_address: 10.0.0.50
-
-networks:
-  home:
-    external: true
-    name: home
-```
-
-## 使用nginx-proxy给容器服务做反代
-```yml
-version: '3.6'
-services:
-  nginx-proxy:
-    image: 'jwilder/nginx-proxy:latest'
-    container_name: nginx-proxy
-    restart: 'unless-stopped'
-    volumes:
-      - '/var/run/docker.sock:/tmp/docker.sock:ro'
-      - '/docker/nginx-proxy/certs:/etc/nginx/certs:ro'
-    environment:
-      - 'HTTP_PORT=80'
-      - 'HTTPS_PORT=443'
-    network_mode: bridge
-    ports:
-      - '10.0.0.10:80:80'
-      - '10.0.0.10:443:443'
-
-  acme.sh:
-    image: 'neilpang/acme.sh:latest'
-    container_name: acme.sh
-    command: 'daemon'
-    restart: 'unless-stopped'
-    volumes:
-      - '/docker/nginx-proxy/acme.sh:/acme.sh'
-      - '/docker/nginx-proxy/certs:/certs'
-      #- '/var/run/docker.sock:/var/run/docker.sock'
-    environment:
-      - 'CF_Token=<CF_TOKEN>'
-    network_mode: bridge
-
-```
-
-```sh
-# 申请证书
-sudo docker exec acme.sh --register-account -m <email>
-sudo docker exec acme.sh --issue --dns dns_cf -k ec-256 -d *.example.com
-
-# 安装证书给nginx-proxy使用
-# 如果申请的是泛域名证书，安装时别写前面的<*.>，否则nginx-proxy不能正确读取证书
-sudo docker exec acme.sh --install-cert --ecc -d "*.example.com" --key-file /certs/example.com.key --fullchain-file /certs/example.com.crt
-
-# 续期证书(一般acme.sh会自动续期)
-sudo docker exec acme.sh --renew --dns dns_cf --ecc -d *.example.com
-
-# 吊销证书
-sudo docker exec acme.sh --revoke --ecc -d *.example.com
-```
-
-之后只要在启动容器时把想要的域名绑定好即可，例如
-```yml
-version: "3.6"
-services:
-  jellyfin:
-    environment:
-      - 'VIRTUAL_HOST=jellyfin.example.com'
-      - 'VIRTUAL_PORT=8096'
-      - 'VIRTUAL_PATH=/'
-    expose:
-      - 8096
-    ports:
-      - '8096:8096'
-```
-
-※ 还需要在DNS服务器或者/etc/hosts上把容器的域名`jellyfin.example.com`绑定到`10.0.0.10`上。
-
-
-## OneDrive
-* https://github.com/abraunegg/onedrive/blob/master/docs/Docker.md
-```sh
-mkdir ~/OneDrive
-mkdir ~/.config/onedrive
-
-vim ~/.config/onedrive/config
-# 添加排除同步的目錄和文件
-skip_dir = "dir1|dir2|dir3"
-skip_dir = "root/path/to/dir1|root/path/to/dir2"
-skip_dir = "Data/Backup"
-skip_file = "Data/file.txt"
-```
-※ 第一次運行需要輸入API Token
-```sh
-docker run -it --name onedrive \
-    -v ~/.config/onedrive:/onedrive/conf \
-    -v ~/OneDrive:/onedrive/data \
-    -e ONEDRIVE_UID=1000 \
-    -e ONEDRIVE_GID=1000 \
-    -e ONEDRIVE_RESYNC=1 \
-    --restart unless-stopped
-    driveone/onedrive:latest
-```
-
-
-## Jellyfin
-* https://jellyfin.org/docs/general/administration/installing.html#docker
-```sh
-sudo mkdir -p /docker/jellyfin/{config,cache}
-sudo chown kaysiness:kaysiness -R /docker/jellyfin
-```
-新建`docker-compose.yml`文件
-```yml
-version: "3.6"
-services:
-  jellyfin:
-    image: jellyfin/jellyfin:latest
-    container_name: jellyfin
-    user: 1000:1000
-    restart: "unless-stopped"
-    environment:
-      - 'ServerIP=10.0.0.50'
-      - 'TZ=Asia/Shanghai'
-    expose:
-      - 8096
-    networks:
-      home:
-        ipv4_address: 10.0.0.50
-    volumes:
-      - '/docker/jellyfin/data/config:/config'
-      - '/docker/jellyfin/data/cache:/cache'
-      - '/usr/share/fonts/noto-cjk:/usr/share/fonts:ro'
-      - '/home/kaysiness/.local/share/fonts:/config/fonts:ro'
-      - '/dev/shm/jellyfinTranscodecs:/config/transcodes'
-    devices:
-      # VAAPI Devices
-      - '/dev/dri/renderD128:/dev/dri/renderD128'
-      - '/dev/dri/card0:/dev/dri/card0'
-    group_add:
-      # VAAPI 还需要把render组添加到docker权限，该组ID可以在/etc/group查看
-      - '989'
-    labels:
-      # containrrr/watchtower自动更新
-      - com.centurylinklabs.watchtower.enable=true
-
-networks:
-  home:
-    external: true
-    name: home
-```
-運行容器
-```sh
-sudo docker-compose up
-```
 
 # [Flatpak](https://wiki.archlinux.org/title/Flatpak)
 ※ 一般情況下，本章節所有的`flatpak`命令都是以普通權限用戶運行，相當於`flatpak --user <command>`。
@@ -698,224 +448,3 @@ flatpak override --env=QT_AUTO_SCREEN_SCALE_FACTOR=1 com.github.iwalton3.jellyfi
 | ~~Visual Studio Code~~ | `yay -S vscodium libdbusmenu-glib` |
 | XnView MP              | `yay -S xnviewmp-system-libs`      |
 | qView                  | `yay -S qview`                     |
-
-
-# 遊戲相關
-## Steam
-```sh
-flatpak install flathub com.valvesoftware.Steam
-
-# 讓Steam能訪問到其他位置上的遊戲庫
-flatpak override com.valvesoftware.Steam --filesystem=/path/to/directory
-
-# HiDPI縮放(150%)
-flatpak override com.valvesoftware.Steam --env=STEAM_FORCE_DESKTOPUI_SCALING=1.5
-
-# 代理
-flatpak override com.valvesoftware.Steam --env=HTTP_PROXY=http://127.0.0.1:8080 --env=HTTPS_PROXY=http://127.0.0.1:8080
-```
-
-
-## 顯卡直通給Windows Guest虛擬機
-* https://wiki.archlinux.org/title/PCI_passthrough_via_OVMF
-* https://doowzs.com/posts/2021/04/rtx-vfio-passthrough/
-
-### 前期準備
-* 主板BIOS開啟iommu和CPU虛擬化
-* 我的硬體為
-  * CPU: AMD Ryzen 7 5700G with Radeon Graphics
-  * GPU: GeForce GTX 960
-  * MEM: 32GB
-
-※ 此處是把GTX 960直通給虛擬機
-
-#### [找出並記下IOMMU分組](https://wiki.archlinux.org/title/PCI_passthrough_via_OVMF#Ensuring_that_the_groups_are_valid)
-```sh
-#!/bin/bash
-shopt -s nullglob
-for g in $(find /sys/kernel/iommu_groups/* -maxdepth 0 -type d | sort -V); do
-    echo "IOMMU Group ${g##*/}:"
-    for d in $g/devices/*; do
-        echo -e "\t$(lspci -nns ${d##*/})"
-    done;
-done;
-```
-執行上面的腳本，找到顯卡所對應的設備ID
-```
-IOMMU Group 10:
-        01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GM206 [GeForce GTX 960] [10de:1401] (rev a1)
-        01:00.1 Audio device [0403]: NVIDIA Corporation GM206 High Definition Audio Controller [10de:0fba] (rev a1)
-```
-這裡是`10de:1401`和`10de:0fba`
-
-### 隔離GPU
-編輯`/etc/default/grub`，修改`GRUB_CMDLINE_LINUX_DEFAULT`的值，添加上設備ID
-```sh
-GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet iommu=pt vfio-pci.ids=10de:1401,10de:0fba"
-```
-
-重新生成`grub.cfg`
-```sh
-sudo grub-mkconfig -o /boot/grub/grub.cfg
-```
-
-提前加载`vfio-pci`內核模塊。編輯`/etc/mkinitcpio.conf`
-```sh
-MODULES=(vfio_pci vfio vfio_iommu_type1 ...)
-```
-
-重新生成mkinitcpio
-```sh
-sudo mkinitcpio -P
-```
-
-以上都完成後，重啟電腦
-
-執行`lspci -nnv`，如果內核驅動顯示為`vfio-pci`則成功了
-```sh
-01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GM206 [GeForce GTX 960] [10de:1401] (rev a1) (prog-if 00 [VGA controller])
-        Subsystem: ASUSTeK Computer Inc. Device [1043:8520]
-        Flags: bus master, fast devsel, latency 0, IRQ 82, IOMMU group 10
-        Memory at f5000000 (32-bit, non-prefetchable) [size=16M]
-        Memory at c0000000 (64-bit, prefetchable) [size=256M]
-        Memory at d0000000 (64-bit, prefetchable) [size=32M]
-        I/O ports at f000 [size=128]
-        Expansion ROM at f6000000 [disabled] [size=512K]
-        Capabilities: <access denied>
-        Kernel driver in use: vfio-pci
-        Kernel modules: nouveau
-```
-
-### 安裝必要軟體
-```sh
-yay -S libvirt virt-manager \
-       iptables-nft dnsmasq dmidecode \ # NAT網絡所需組件
-       qemu-base \
-       edk2-ovmf \
-       samba # 如果需要共享檔案給虛擬機，需要用到SMB
-
-# 把當前用戶添加到libvirt組，可讓每次打開virt-manager時不需要密碼
-sudo gpasswd -a kaysiness libvirt
-
-# 啟用相應Deamon
-sudo systemctl enable --now libvirtd.service
-```
-
-注意事項：  
-* 默認的NAT網絡`default`預設是不啟用的，以下命令可以設定為開機啟用和立即啟用網絡
-  * `sudo virsh net-autostart default`
-  * `sudo virsh net-start default`
-
-### 安裝Windows 10
-
-注意事項：
-* 芯片組選`Q35`，固件選`UEFI x86_64: /usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.fd`
-* CPU類型選`host-passthrough`
-* 其他保持默認，先把系統安裝好後再添加直通顯卡進去
-
-安裝完成後關閉虛擬機
-
-### 修改Windows 10的虛擬設定
-因為NVIDIA的驅動會檢查是否是虛擬機環境，所有要進行隱藏  
-※ 以下這個XML內容都可以在`virt-manager`裡編輯
-```xml
-<features>
-  <hyperv mode="custom">
-    <vendor_id state="on" value="4aecc49d5d33"/>
-    ......
-  </hyperv>
-  <kvm>
-    <hidden state="on"/>
-  </kvm>
-  ......
-</features>
-```
-
-AMD Ryzen CPU 还需要额外修改
-```xml
-<cpu mode="host-passthrough" check="none" migratable="on">
-  <feature policy="require" name="topoext"/>
-</cpu>
-```
-
-在`virt-manager`裡把舊的虛擬顯卡刪除，並把GTX 960和evdev鼠標鍵盤加上去。
-
-我是喜歡Host OS和Guest OS共用一套鼠標鍵盤，好處是不用額外把一組USB控制器分給虛擬機，只需要同時按住左右兩個Ctrl鍵即可在兩套OS之間切換。
-
-首先查看鼠標鍵盤的設備路徑，執行`ls -l /dev/input/by-id/`，我的輸出結果如下
-```
-drwxr-xr-x  - root 07-06 11:05 /dev/input/by-id
-lrwxrwxrwx 10 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-event-if01 -> ../event10
-lrwxrwxrwx 10 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-event-if02 -> ../event12
-lrwxrwxrwx  9 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-event-kbd -> ../event8
-lrwxrwxrwx  9 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-if01-event-mouse -> ../event9
-lrwxrwxrwx  9 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-if01-mouse -> ../mouse0
-lrwxrwxrwx 10 root 07-06 11:05 ├── usb-Microsoft_Microsoft®_2.4GHz_Transceiver_v8.0-if02-event-kbd -> ../event11
-lrwxrwxrwx  9 root 07-06 11:05 ├── usb-USB_Keyboard_USB_Keyboard_C104A000000A-event-if01 -> ../event7
-lrwxrwxrwx  9 root 07-06 11:05 └── usb-USB_Keyboard_USB_Keyboard_C104A000000A-event-kbd -> ../event6
-```
-正確的路徑是帶有event值這些，我這裡是`event9`和`event6`
-
-然後增加以下的內容。PS/2管線的那一套虛擬鼠標鍵盤是不能刪除的，保留即可
-```xml
-<devices>
-  ......
-  <input type="evdev">
-    <source dev="/dev/input/by-id/usb-Microsoft_Microsoft&#xAE;_2.4GHz_Transceiver_v8.0-if01-event-mouse"/>
-  </input>
-  <input type="evdev">
-    <source dev="/dev/input/by-id/usb-USB_Keyboard_USB_Keyboard_C104A000000A-event-kbd" grab="all" repeat="on"/>
-  </input>
-  <input type="mouse" bus="ps2"/>
-  <input type="keyboard" bus="ps2"/>
-  ......
-</devices> 
-```
-
-編輯`default`網絡，給虛擬機分配一個固定IP地址
-```xml
-<network connections="1">
-  <name>default</name>
-  <uuid>2928a687-370c-4f94-99c3-459c749fe47c</uuid>
-  <forward mode="nat">
-    <nat>
-      <port start="1024" end="65535"/>
-    </nat>
-  </forward>
-  <bridge name="virbr0" stp="on" delay="0"/>
-  <mac address="52:54:00:16:7c:1b"/>
-  <ip address="192.168.122.1" netmask="255.255.255.0">
-    <dhcp>
-      <range start="192.168.122.2" end="192.168.122.254"/>
-      <host mac="52:54:00:59:8d:9a" name="win10" ip="192.168.122.10"/>
-    </dhcp>
-  </ip>
-</network>
-```
-
-給虛擬機添加各種協議的端口映射
-```sh
-sudo mkdir /etc/libvirt/hooks
-
-sudo vim /etc/libvirt/hooks/qemu
-#!/bin/bash
-if [ "${1}" = "win10" ]; then # 修改为虚拟机的名称
-   GUEST_IP=192.168.122.10 # 填入Windows虚拟机的IP地址
-   for PORT in 3389 47984 47989 48010 47998 47999 48000; do
-     if [ "${2}" = "stopped" ] || [ "${2}" = "reconnect" ]; then
-        /sbin/iptables -D FORWARD -o virbr0 -p tcp -d $GUEST_IP --dport $PORT -j ACCEPT
-        /sbin/iptables -t nat -D PREROUTING -p tcp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
-        /sbin/iptables -D FORWARD -o virbr0 -p udp -d $GUEST_IP --dport $PORT -j ACCEPT
-        /sbin/iptables -t nat -D PREROUTING -p udp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
-     fi
-     if [ "${2}" = "start" ] || [ "${2}" = "reconnect" ]; then
-        /sbin/iptables -I FORWARD -o virbr0 -p tcp -d $GUEST_IP --dport $PORT -j ACCEPT
-        /sbin/iptables -t nat -I PREROUTING -p tcp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
-        /sbin/iptables -I FORWARD -o virbr0 -p udp -d $GUEST_IP --dport $PORT -j ACCEPT
-        /sbin/iptables -t nat -I PREROUTING -p udp --dport $PORT -j DNAT --to $GUEST_IP:$PORT
-     fi
-   done
-fi
-
-sudo chmod +x /etc/libvirt/hooks/qemu
-```
