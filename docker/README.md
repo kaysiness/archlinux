@@ -1,6 +1,26 @@
 記錄下自己安裝和設定Docker的過程，基於`Docker version 27.3.1, build ce1223035a`和`Docker Compose version 2.29.7`。
 
+- [安裝與設定](#安裝與設定)
+  - [打開IPv6支持](#打開ipv6支持)
+  - [啓動服務](#啓動服務)
+- [創建給容器用的Bridge網絡](#創建給容器用的bridge網絡)
+- [創建給容器用的Macvlan網絡](#創建給容器用的macvlan網絡)
+  - [注意事項](#注意事項)
+  - [手動創建Macvlan網絡](#手動創建macvlan網絡)
+  - [容器加入macvlan網絡並指定IP地址的方法](#容器加入macvlan網絡並指定ip地址的方法)
+  - [解決宿主機無法訪問容器的問題](#解決宿主機無法訪問容器的問題)
+    - [創建自動添加macvtap網卡的bash腳本](#創建自動添加macvtap網卡的bash腳本)
+- [使用nginx-proxy自動給容器服務做反代](#使用nginx-proxy自動給容器服務做反代)
+  - [注意事項](#注意事項-1)
+  - [啓動`acme.sh`和`nginx-proxy`容器](#啓動acmesh和nginx-proxy容器)
+  - [申請SSL證書](#申請ssl證書)
+  - [監控證書變化並自動重啓nginx-proxy容器](#監控證書變化並自動重啓nginx-proxy容器)
+  - [給容器綁定域名](#給容器綁定域名)
+  - [docker-compose.yml 完整演示例子](#docker-composeyml-完整演示例子)
+
 <!--more-->
+
+---
 
 # 安裝與設定
 ```bash
@@ -47,7 +67,7 @@ sudo docker network create \
   home-br
 ```
 
-# 创建给容器用的Macvlan网络
+# 創建給容器用的Macvlan網絡
 ## 注意事項
 1. 只要DHCPv6/SLAAC正常的話，加入網絡的容器也能獲取到公網IPv6地址
 2. 容器對局域網內其他主機提供服務的話，macvlan按理說比端口映射性能好
@@ -101,19 +121,19 @@ networks:
 * [/usr/local/bin/macvtap.sh](/docker/bin/macvtap.sh)
 
 
-## 使用nginx-proxy自動給容器服務做反代
+# 使用nginx-proxy自動給容器服務做反代
 應該沒人喜歡通過`ip:port`來訪問容器服務的，而且每個加入home-lan的容器IP也不可能全部記住，那麼使用Nginx來做服務反代就很有必要了
 在自動反代服務上有很多選擇，比如`Nginx Proxy Manager`和`Traefik`，我選擇 https://github.com/nginx-proxy/nginx-proxy 來實現，因爲後者簡單方便
 
-### 注意事項
+## 注意事項
 1. 需要一個域名，下文使用`docker.kkun.date`這個域名來演示，使用`srv1.docker.kkun.date`來訪問srv1容器，以此類推
 2. 通過acme.sh給`*.docker.kkun.date`域名申請SSL證書，不申請也可以但現代瀏覽器會提示http不安全
 3. 最好有一個本地DNS，把`*.docker.kkun.date`解析到`nginx-proxy`容器的IP地址
 
-### 啓動`acme.sh`和`nginx-proxy`容器
+## 啓動`acme.sh`和`nginx-proxy`容器
 * [docker-compose.yml](/docker/docker-compose/nginx-proxy.yml)
 
-### 申請SSL證書
+## 申請SSL證書
 ```bash
 # 申請證書
 sudo docker exec acme.sh --register-account -m <email>
@@ -131,13 +151,13 @@ sudo docker exec acme.sh --renew --dns dns_cf --ecc -d "*.docker.kkun.date"
 sudo docker exec acme.sh --revoke --ecc -d "*.docker.kkun.date"
 ```
 
-### 監控證書變化並自動重啓nginx-proxy容器
+## 監控證書變化並自動重啓nginx-proxy容器
 * [/usr/local/bin/certs-renew.sh](/docker/bin/certs-renew.sh)
 * [/etc/systemd/system/certs-renew.service](/docker/systemd/certs-renew.service)
 * [/etc/systemd/system/certs-renew.path](/docker/systemd/certs-renew.path)
 
 
-### 給容器綁定域名
+## 給容器綁定域名
 通過給容器添加`VIRTUAL_HOST`和`VIRTUAL_PORT`環境變量，並指定域名和端口號即可
 
 以下是一個簡單的例子
@@ -173,7 +193,7 @@ services:
 ```
 
 
-### docker-compose.yml 完整演示例子
+## docker-compose.yml 完整演示例子
 ```yaml
 services:
   syncthing:
